@@ -1,0 +1,20 @@
+# Composer
+/vendor/
+composer.lock
+
+# PHPUnit
+/.phpunit.result.cache
+/phpunit.xml
+/coverage/
+
+# Local env / secrets — NEVER commit the resolved JWKS URI / issuer / any secret.
+.env
+.env.local
+*.pem
+*.key
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

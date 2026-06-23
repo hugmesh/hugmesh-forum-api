@@ -1,0 +1,54 @@
+# Local validation harness for the snapdragon/json-api phpBB extension.
+#
+# Brings up phpBB 3.3 (with this extension baked in) + MySQL so you can run the live
+# smoke test that the unit tests CANNOT cover (real submit_post() / content_visibility /
+# user_add against a real schema).
+#
+# Usage:
+#   docker compose up --build
+#   # then open http://localhost:8080 and run the phpBB web installer (DB host=db,
+#   # name=phpbb, user=phpbb, pass=phpbb). After install, restart the phpbb service so
+#   # the entrypoint enables snapdragon/json-api, then exercise:
+#   #   GET  http://localhost:8080/app.php/api/v1/snapdragon/stats
+#   #        -H "Authorization: Bearer <casdoor-jwt>" -H "X-Snapdragon-JWT: <casdoor-jwt>"
+#   #   POST http://localhost:8080/app.php/api/v1/snapdragon/topics  (CreateTopic body)
+#
+# JWKS/issuer point at your dev Casdoor; with no live Casdoor the extension fails closed
+# (401) — which itself proves the auth gate.
+
+services:
+    db:
+        image: mysql:8.0
+        environment:
+            MYSQL_ROOT_PASSWORD: rootpw
+            MYSQL_DATABASE: phpbb
+            MYSQL_USER: phpbb
+            MYSQL_PASSWORD: phpbb
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpw"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+        volumes:
+            - db_data:/var/lib/mysql
+
+    phpbb:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: snapdragon-systems/phpbb:dev
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            PHPBB_EXTENSION: snapdragon/json-api
+            # Point these at a dev Casdoor. With no live Casdoor the extension fails
+            # closed (every request -> 401), which proves the JWT gate.
+            SNAPDRAGON_JWKS_URI: "${SNAPDRAGON_JWKS_URI:-https://casdoor.dev.local/.well-known/jwks}"
+            SNAPDRAGON_JWT_ISSUER: "${SNAPDRAGON_JWT_ISSUER:-https://casdoor.dev.local}"
+            SNAPDRAGON_JWT_AUDIENCE: "${SNAPDRAGON_JWT_AUDIENCE:-}"
+        ports:
+            - "8080:80"
+
+volumes:
+    db_data:

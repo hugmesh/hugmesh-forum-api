@@ -1,0 +1,49 @@
+# Snapdragon JSON API — GitLab CI (this org uses GitLab CI, not GitHub Actions).
+#
+# Stages: lint (php -l every file) -> validate (composer) -> test (phpunit).
+# No live phpBB is required; the unit suite exercises the JWT/JWKS auth chain only.
+
+stages:
+    - lint
+    - validate
+    - test
+
+default:
+    image: php:8.1-cli
+
+variables:
+    COMPOSER_ALLOW_SUPERUSER: "1"
+
+.composer_setup: &composer_setup
+    - apt-get update -qq && apt-get install -y -qq git unzip libzip-dev > /dev/null
+    - docker-php-ext-install zip > /dev/null 2>&1 || true
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+
+php-lint:
+    stage: lint
+    script:
+        - echo "Running php -l on every .php file"
+        - |
+            fail=0
+            while IFS= read -r f; do
+                if ! php -l "$f" > /dev/null; then
+                    echo "SYNTAX ERROR: $f"
+                    php -l "$f"
+                    fail=1
+                fi
+            done < <(find . -path ./vendor -prune -o -name '*.php' -print)
+            exit $fail
+
+composer-validate:
+    stage: validate
+    script:
+        - *composer_setup
+        - composer validate --no-check-publish
+
+phpunit:
+    stage: test
+    script:
+        - *composer_setup
+        - composer install --no-interaction --prefer-dist
+        - vendor/bin/phpunit --colors=never

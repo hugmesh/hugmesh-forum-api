@@ -1,0 +1,92 @@
+# Snapdragon JSON API — service container definitions.
+#
+# Wires the auth chain (JWKS provider -> JWT verifier -> authenticator), the
+# config provider, the data services, and the three controllers, injecting phpBB
+# core services (@dbal.conn, @user, @auth, @config, @content.visibility) and the
+# %core.*% parameters.
+
+services:
+
+    # ── configuration ────────────────────────────────────────────────
+    snapdragon.jsonapi.config_provider:
+        class: snapdragon\jsonapi\config_provider
+        arguments:
+            - '@config'
+
+    # ── auth chain ───────────────────────────────────────────────────
+    # The factory reads the env/config-resolved JWKS URI / issuer / audience at
+    # request time (no ExpressionLanguage dependency in the container).
+    snapdragon.jsonapi.auth.factory:
+        class: snapdragon\jsonapi\auth\auth_factory
+        arguments:
+            - '@snapdragon.jsonapi.config_provider'
+            - '@cache.driver'
+
+    snapdragon.jsonapi.auth.authenticator:
+        class: snapdragon\jsonapi\auth\authenticator
+        factory: ['@snapdragon.jsonapi.auth.factory', 'authenticator']
+
+    # ── data services ────────────────────────────────────────────────
+    snapdragon.jsonapi.service.forum_repository:
+        class: snapdragon\jsonapi\service\forum_repository
+        arguments:
+            - '@dbal.conn'
+            - '%core.table_prefix%'
+
+    snapdragon.jsonapi.service.user_mapper:
+        class: snapdragon\jsonapi\service\user_mapper
+        arguments:
+            - '@dbal.conn'
+            - '@config'
+            - '%core.table_prefix%'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    snapdragon.jsonapi.service.posting_service:
+        class: snapdragon\jsonapi\service\posting_service
+        arguments:
+            - '@dbal.conn'
+            - '@user'
+            - '@auth'
+            - '@content.visibility'
+            - '@config'
+            - '%core.table_prefix%'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    snapdragon.jsonapi.service.admin_service:
+        class: snapdragon\jsonapi\service\admin_service
+        arguments:
+            - '@dbal.conn'
+            - '@snapdragon.jsonapi.service.user_mapper'
+            - '@snapdragon.jsonapi.service.forum_repository'
+            - '@config'
+            - '@service_container'
+            - '%core.table_prefix%'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    # ── controllers ──────────────────────────────────────────────────
+    snapdragon.jsonapi.controller.read:
+        class: snapdragon\jsonapi\controller\read_controller
+        arguments:
+            - '@snapdragon.jsonapi.auth.authenticator'
+            - '@snapdragon.jsonapi.service.forum_repository'
+
+    snapdragon.jsonapi.controller.write:
+        class: snapdragon\jsonapi\controller\write_controller
+        arguments:
+            - '@snapdragon.jsonapi.auth.authenticator'
+            - '@snapdragon.jsonapi.service.forum_repository'
+            - '@snapdragon.jsonapi.service.posting_service'
+            - '@snapdragon.jsonapi.service.user_mapper'
+            - '@snapdragon.jsonapi.config_provider'
+
+    snapdragon.jsonapi.controller.admin:
+        class: snapdragon\jsonapi\controller\admin_controller
+        arguments:
+            - '@snapdragon.jsonapi.auth.authenticator'
+            - '@snapdragon.jsonapi.service.user_mapper'
+            - '@snapdragon.jsonapi.service.forum_repository'
+            - '@snapdragon.jsonapi.service.admin_service'
+            - '@snapdragon.jsonapi.service.posting_service'
