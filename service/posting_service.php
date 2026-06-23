@@ -393,8 +393,13 @@ class posting_service
      */
     private function as_user($poster_id, callable $fn)
     {
+        // Capture the ORIGINAL session identity verbatim — even if it is null/unset — so the
+        // finally can restore the EXACT value we entered with. A cross-request-identity path
+        // must never be left in the impersonated state, regardless of how shallow the entry
+        // session was. (isset() yields null both when data is unset AND when it is literally
+        // null; either way the captured original is what we restore to.)
         $original = isset($this->user->data) ? $this->user->data : null;
-        $acl_restored = false;
+        $can_acl = ($this->auth !== null && method_exists($this->auth, 'acl'));
 
         $row = $this->load_user_row((int) $poster_id);
         if ($row !== null)
@@ -416,10 +421,9 @@ class posting_service
 
             // Re-prime the ACL for the impersonated user so submit_post()'s acl_get()
             // evaluates as $poster_id, not as the original (often anonymous) session.
-            if ($this->auth !== null && method_exists($this->auth, 'acl'))
+            if ($can_acl)
             {
                 $this->auth->acl($this->user->data);
-                $acl_restored = true;
             }
         }
 
@@ -429,12 +433,12 @@ class posting_service
         }
         finally
         {
-            if ($original !== null)
-            {
-                $this->user->data = $original;
-            }
-            // Restore the ACL to the original session user regardless of how we exit.
-            if ($acl_restored && $original !== null && $this->auth !== null && method_exists($this->auth, 'acl'))
+            // UNCONDITIONAL restore: always put back the EXACT original $user->data we
+            // captured (even when it was null), and always re-prime $auth->acl to that same
+            // original identity — even on exception, and even if we never entered the
+            // impersonation branch above. Never leave the impersonated identity/ACL in place.
+            $this->user->data = $original;
+            if ($can_acl)
             {
                 $this->auth->acl($original);
             }
