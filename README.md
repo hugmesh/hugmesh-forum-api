@@ -1,4 +1,4 @@
-# snapdragon/json-api — phpBB 3.3 headless JSON API extension
+# snapdragon/jsonapi — phpBB 3.3 headless JSON API extension
 
 The **server side** the (already-built) `snapdragon-forum-bff-api` client calls. phpBB
 ships no first-class REST API; this extension registers routes under
@@ -38,6 +38,7 @@ match the forum-bff Jackson records exactly; timestamps are ISO-8601 strings.
 
 | Method | Path | Body | Returns | Authz |
 |---|---|---|---|---|
+| GET | `/health` | — | `{status,service}` (200) | **none** (k8s probe) |
 | GET | `/categories` | — | `Category[]` | user |
 | GET | `/topics?categoryId={id}` | — | `Topic[]` | user |
 | GET | `/topics/{id}` | — | `Topic` | user |
@@ -107,6 +108,13 @@ CreateCategory  { name:string, description:string, parentId:long? }
    `ROLE_USER`+ (edit/delete enforce post ownership unless MOD/ADMIN); moderation =
    `ROLE_MOD`+; `/admin/**`, `ensure`, group-sync = `ROLE_ADMIN`. Status codes: 401
    (no/invalid token), 403 (wrong role/ownership), 404 (missing), 400 (bad body).
+
+> **One deliberate exception:** `GET /health` is **unauthenticated** — a Kubernetes
+> liveness/readiness probe carries no JWT. It returns a static `{status,service}` literal
+> (no DB query, no caller input, no forum data) and is safe to expose because the phpBB
+> Service is ClusterIP-only with no ingress and a NetworkPolicy that admits only
+> forum-bff / admin-bff / the sync Job. It is still wrapped in the fail-closed JSON
+> error envelope.
 
 Config is read from env first, then the phpBB config table, then a default — **no
 secret is committed**. See `.env.example`.
@@ -207,8 +215,48 @@ docker compose up --build      # phpBB 3.3 + MySQL with this extension
 # /app.php/api/v1/snapdragon/** with a Casdoor JWT.
 ```
 
-CI is GitLab (`.gitlab-ci.yml`): `php -l` → `composer validate` → `phpunit`. (No GitHub
-Actions — this org uses GitLab CI.)
+CI is GitLab (`.gitlab-ci.yml`): `php -l` → `composer validate` → `phpunit` → **`build:image`**
+(bakes + pushes the custom phpBB image; default branch / tags only, from the privileged x86
+runner). (No GitHub Actions — this org uses GitLab CI.)
+
+---
+
+## Go-live status (honest)
+
+**Live-proven** (against real **phpBB 3.3.11**):
+
+- The custom image **builds** (official phpBB 3.3.11 on `php:8.1-apache` + this extension at
+  `ext/snapdragon/jsonapi/` + `firebase/php-jwt`), and the `build:image` CI stage pushes it.
+- The extension **enables** under the de-hyphenated name `snapdragon/jsonapi` (the hyphenated
+  package would not enable at all — see the composer-name note above).
+- The schema **migration runs** — the `phpbb_snapdragon_casdoor_map` table is created.
+- The routes **register and match** — the full authed contract round-trip
+  (acts-as-user authorship, moderation visibility, group sync, ownership/role gates) plus
+  every auth negative passed a MySQL docker-compose smoke (30/30) against a real install,
+  and the unauthenticated `/health` probe returns `200`.
+
+**NOT yet live-proven:** end-to-end authed HTTP posting **through the route on a
+cluster-shaped (pgsql, init→main split) harness**. This is gated by phpBB board-level
+bring-up nuances — `$user->setup()` runs **before** the extension dispatches and fails
+closed with *"this board is currently unavailable"* for **every** route (including
+`/health`) while `install/` exists, and the `board_disable` flag has the same
+all-route reach. It is a **bootstrap/lockdown** concern, **not an extension bug**; the
+fix lives in the entrypoint/Dockerfile (remove `install/`; Apache-level lockdown instead
+of `board_disable`) — see the in-flight forum go-live PR.
+
+**Generator follow-ups for true on-cluster go-live:**
+
+- `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
+  **`snapdragon/jsonapi`** name (no hyphen) and run the **`snapdragon-systems/phpbb:dev`**
+  image this repo builds.
+- Keep the board locked down via the image-level Apache lockdown / NetworkPolicy (the
+  `board_disable`-vs-API-exemption tension above), not the board-disable flag.
+- The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) vs. binding port 80 /
+  entrypoint chown needs reconciliation for a true non-priv on-cluster run.
+
+This extension is the previously-"unbuilt external contract" the forum-bff
+(`snapdragon-forum-bff-api`) `PhpbbApiClient` was written against — now built. Flipping
+`phpbb.enabled=true` on the forum-bff is config-only once the image is on-cluster (see above).
 
 ---
 
