@@ -1,42 +1,211 @@
 #!/usr/bin/env bash
 #
-# Snapdragon phpBB entrypoint.
+# Snapdragon phpBB entrypoint (MAIN container).
 #
-# On first boot (when phpBB is installed and a DB is reachable) it enables the
-# snapdragon/jsonapi extension via phpbbcli, so the /api/v1/snapdragon/** routes are
-# live. It is idempotent: re-enabling an already-enabled extension is a no-op. If phpBB
-# is not yet installed (no config.php), it skips enabling and lets the operator run the
-# phpBB installer first.
+# WHY THIS EXISTS — the init/main filesystem-isolation problem:
+#   On-cluster (snapdragon-generator forum/phpbb.yaml) phpBB runs as a Deployment whose
+#   initContainer and main container DO NOT share a root filesystem — only mounted
+#   volumes do, and the PVC mounts ONLY /var/www/html/store. So a config.php written by
+#   the initContainer to /var/www/html/config.php is INVISIBLE to the main container,
+#   which boots from the image's own (0-byte) config.php. phpBB would then have no DB
+#   connection params and could never serve.
+#
+#   The fix implemented here: config.php is the source-of-DERIVED-truth — it holds only
+#   connection params + $table_prefix + the admin relative path; the board's real
+#   secrets live in the DB `config` table. So we (RE)GENERATE config.php from env on
+#   EVERY boot in the MAIN container, using the least-privilege app role (phpbb_app).
+#   It therefore always exists in the running container regardless of init/main
+#   isolation and survives restarts (the external Postgres is the source of truth).
+#
+# Boot sequence (idempotent — safe on every pod restart):
+#   1. (re)generate config.php from env with the app-role creds;
+#   2. ensure the DB schema is installed (DDL-once, guarded by a table-existence probe;
+#      see SCHEMA INSTALL below) — does NOT re-install an already-installed board;
+#   3. enable the snapdragon/jsonapi extension (idempotent), so /api/v1/snapdragon/**
+#      answers; then exec the CMD (apache2-foreground).
+#
+# EMPTY-CONFIG TRAP: phpBB 3.3.11 ships a 0-byte config.php baked into the release zip
+#   (and thus into this image). A bare `[ -f config.php ]` check FALSELY concludes
+#   "installed" and skips work. We detect a REAL config by NON-EMPTY (`-s`), and a real
+#   install by probing the DB for phpBB's tables — never bare `-f`.
 #
 # Required env (injected by the deployment, NEVER baked into the image):
-#   SNAPDRAGON_JWKS_URI     the Casdoor jwks_uri
-#   SNAPDRAGON_JWT_ISSUER   the expected iss claim
-#   SNAPDRAGON_JWT_AUDIENCE (optional) the expected aud claim
+#   Connection (config.php) — all needed to (re)generate config.php every boot:
+#     PHPBB_DB_DRIVER     phpBB DBAL driver class (e.g. phpbb\db\driver\postgres)
+#     PHPBB_DB_HOST       DB host
+#     PHPBB_DB_PORT       DB port (e.g. 5432)
+#     PHPBB_DB_NAME       DB name
+#     PHPBB_DB_USER       RUNTIME login = the least-privilege app role (phpbb_app)
+#     PHPBB_APP_PASSWORD  the app role's password (from Secret phpbb-db-app-auth)
+#     PHPBB_TABLE_PREFIX  table prefix (default phpbb_)
+#   Extension JWT config (validated at request time by the extension, fail-closed):
+#     SNAPDRAGON_JWKS_URI     the Casdoor jwks_uri
+#     SNAPDRAGON_JWT_ISSUER   the expected iss claim
+#     SNAPDRAGON_JWT_AUDIENCE (optional) the expected aud claim
+#   Schema install (used ONLY when the DB is empty — see SCHEMA INSTALL):
+#     PHPBB_INSTALL_CONFIG    path to a phpbbcli install YAML (its dbuser/dbpasswd are
+#                             the OWNER role, supplied by the deployment). If unset,
+#                             schema install is SKIPPED (the deployment's initContainer
+#                             owns DDL instead) and we only require the DB to be present.
 #
 set -euo pipefail
 
+log() { echo "[snapdragon-entrypoint] $*"; }
+
 PHPBB_ROOT="${PHPBB_ROOT:-/var/www/html}"
 EXT_NAME="${PHPBB_EXTENSION:-snapdragon/jsonapi}"
+TABLE_PREFIX="${PHPBB_TABLE_PREFIX:-phpbb_}"
 
 cd "$PHPBB_ROOT"
 
-if [[ -f "config.php" ]]; then
-    echo "[snapdragon-entrypoint] phpBB config.php present — ensuring extension '${EXT_NAME}' is enabled"
-    # phpbbcli is the supported offline management CLI for 3.3.
-    if php bin/phpbbcli.php extension:show 2>/dev/null | grep -q "${EXT_NAME}"; then
-        php bin/phpbbcli.php extension:enable "${EXT_NAME}" || \
-            echo "[snapdragon-entrypoint] extension:enable returned non-zero (already enabled?) — continuing"
-    else
-        echo "[snapdragon-entrypoint] extension '${EXT_NAME}' not discovered by phpbbcli — check ext/snapdragon/jsonapi"
+# ── 1. (RE)GENERATE config.php FROM ENV (every boot) ────────────────────────
+# config.php is deterministically derivable from env: connection params +
+# $table_prefix + the admin relative path. We always rewrite it so the MAIN
+# container has a working config regardless of init/main filesystem isolation.
+regenerate_config() {
+    if [[ -z "${PHPBB_DB_HOST:-}" || -z "${PHPBB_DB_NAME:-}" || -z "${PHPBB_DB_USER:-}" ]]; then
+        log "WARNING: PHPBB_DB_HOST/PHPBB_DB_NAME/PHPBB_DB_USER not all set — leaving config.php as-is"
+        return 0
     fi
-else
-    echo "[snapdragon-entrypoint] no config.php yet — phpBB not installed; run the phpBB installer, then restart to enable '${EXT_NAME}'"
-fi
+    local driver="${PHPBB_DB_DRIVER:-phpbb\\db\\driver\\postgres}"
+    local port="${PHPBB_DB_PORT:-5432}"
+    local pass="${PHPBB_APP_PASSWORD:-}"
+    # Pass values as ENVIRONMENT (prefix assignments before `php`), never as $argv —
+    # getenv() reads the process env, so trailing args would be ignored. Single-quoted
+    # PHP string literals; escape backslashes and single quotes so the driver FQCN and
+    # any special chars in the password survive verbatim.
+    SD_DBMS="$driver" SD_DBHOST="$PHPBB_DB_HOST" SD_DBPORT="$port" SD_DBNAME="$PHPBB_DB_NAME" \
+    SD_DBUSER="$PHPBB_DB_USER" SD_DBPASSWD="$pass" SD_TABLE_PREFIX="$TABLE_PREFIX" \
+    php -r '
+        $esc = function ($v) { return str_replace(["\\", "\x27"], ["\\\\", "\\\x27"], (string) $v); };
+        $out  = "<?php\n";
+        $out .= "// Generated by snapdragon-entrypoint from env on boot. Do not edit by hand.\n";
+        $out .= "\$dbms = \x27"        . $esc(getenv("SD_DBMS"))       . "\x27;\n";
+        $out .= "\$dbhost = \x27"      . $esc(getenv("SD_DBHOST"))     . "\x27;\n";
+        $out .= "\$dbport = \x27"      . $esc(getenv("SD_DBPORT"))     . "\x27;\n";
+        $out .= "\$dbname = \x27"      . $esc(getenv("SD_DBNAME"))     . "\x27;\n";
+        $out .= "\$dbuser = \x27"      . $esc(getenv("SD_DBUSER"))     . "\x27;\n";
+        $out .= "\$dbpasswd = \x27"    . $esc(getenv("SD_DBPASSWD"))   . "\x27;\n";
+        $out .= "\$table_prefix = \x27". $esc(getenv("SD_TABLE_PREFIX")) . "\x27;\n";
+        $out .= "\$phpbb_adm_relative_path = \x27adm/\x27;\n";
+        $out .= "\$acm_type = \x27phpbb\\\\cache\\\\driver\\\\file\x27;\n";
+        $out .= "@define(\x27PHPBB_INSTALLED\x27, true);\n";
+        $out .= "@define(\x27PHPBB_ENVIRONMENT\x27, \x27production\x27);\n";
+        file_put_contents("config.php", $out);
+    '
+    log "config.php (re)generated from env: dbms=${driver} host=${PHPBB_DB_HOST} db=${PHPBB_DB_NAME} user=${PHPBB_DB_USER} prefix=${TABLE_PREFIX}"
+}
+
+# ── 2. SCHEMA INSTALL (DDL-once, guarded) ───────────────────────────────────
+# Probe the external DB for phpBB's bootstrap table (<prefix>config). If present, the
+# board is already installed and we DO NOT re-DDL (the install would otherwise fail /
+# clobber). If absent AND PHPBB_INSTALL_CONFIG is set, run the headless installer (its
+# YAML carries the OWNER creds). When PHPBB_INSTALL_CONFIG is unset the deployment's
+# initContainer is responsible for DDL; we simply proceed (config.php regenerated above
+# lets the main container connect once the schema exists).
+schema_already_installed() {
+    # A tiny pgsql probe for phpBB's bootstrap table, using the app-role creds (env,
+    # not $argv). Exit codes: 0 installed, 1 empty, 2 no pgsql, 3 unreachable, 4 query err.
+    SD_DBHOST="$PHPBB_DB_HOST" SD_DBPORT="${PHPBB_DB_PORT:-5432}" SD_DBNAME="$PHPBB_DB_NAME" \
+    SD_DBUSER="$PHPBB_DB_USER" SD_DBPASSWD="${PHPBB_APP_PASSWORD:-}" SD_TABLE_PREFIX="$TABLE_PREFIX" \
+    php -r '
+        $host = getenv("SD_DBHOST"); $port = getenv("SD_DBPORT"); $name = getenv("SD_DBNAME");
+        $user = getenv("SD_DBUSER"); $pass = getenv("SD_DBPASSWD"); $prefix = getenv("SD_TABLE_PREFIX");
+        if (!function_exists("pg_connect")) { fwrite(STDERR, "pgsql ext missing\n"); exit(2); }
+        $conn = @pg_connect("host=$host port=$port dbname=$name user=$user password=$pass connect_timeout=5");
+        if ($conn === false) { exit(3); } // cannot connect yet
+        $res = @pg_query_params($conn, "SELECT to_regclass($1) IS NOT NULL", [$prefix . "config"]);
+        if ($res === false) { exit(4); }
+        $row = pg_fetch_row($res);
+        exit($row[0] === "t" ? 0 : 1); // 0 = installed, 1 = empty
+    '
+}
+
+install_schema_if_needed() {
+    if [[ -z "${PHPBB_INSTALL_CONFIG:-}" ]]; then
+        log "PHPBB_INSTALL_CONFIG unset — schema install delegated to the deployment initContainer (owner role); skipping in main"
+        return 0
+    fi
+    set +e
+    schema_already_installed
+    local rc=$?
+    set -e
+    case "$rc" in
+        0) log "DB schema already present (<prefix>config exists) — NOT re-installing (DDL-once honored)"; return 0 ;;
+        1) log "DB reachable but empty — running headless install ${PHPBB_INSTALL_CONFIG} (DDL once, OWNER creds from the YAML)"
+           # The headless installer writes config.php too, but we re-derive it from env
+           # afterwards (step 1 re-runs below) so the MAIN container always uses the
+           # least-privilege app role, never the OWNER creds in the install YAML.
+           php install/phpbbcli.php install "${PHPBB_INSTALL_CONFIG}" -n
+           log "headless install complete"
+           ;;
+        2) log "FATAL: pgsql PHP extension missing — cannot probe/install Postgres schema"; exit 1 ;;
+        3) log "WARNING: DB not reachable yet for schema probe — leaving install to a later boot / the initContainer"; return 0 ;;
+        *) log "WARNING: schema probe returned ${rc} — continuing without install"; return 0 ;;
+    esac
+}
+
+# ── 3. ENABLE THE EXTENSION (every boot, idempotent) ────────────────────────
+enable_extension() {
+    # phpbbcli needs a non-empty config.php AND an installed DB; both are ensured above.
+    if [[ ! -s "config.php" ]]; then
+        log "config.php is empty/absent — cannot enable extension; skipping (will retry next boot)"
+        return 0
+    fi
+    if php bin/phpbbcli.php extension:show 2>/dev/null | grep -q "${EXT_NAME}"; then
+        php bin/phpbbcli.php extension:enable "${EXT_NAME}" \
+            && log "extension '${EXT_NAME}' enabled (or already enabled)" \
+            || log "extension:enable returned non-zero (already enabled?) — continuing"
+    else
+        log "extension '${EXT_NAME}' not yet discoverable by phpbbcli (DB not installed yet?) — skipping this boot"
+    fi
+}
+
+# ── 4. RUNTIME FILE OWNERSHIP / CACHE / INSTALL-DIR REMOVAL ─────────────────
+# Three things must be right before apache serves:
+#
+#  (a) install/ MUST be gone. phpBB's $user->setup() (which runs in app.php BEFORE the
+#      extension's HttpKernel dispatch) FAILS CLOSED with "Sorry but this board is
+#      currently unavailable." for EVERY request — including /api/v1/snapdragon/health —
+#      whenever the install/ directory still exists (a phpBB security requirement). The
+#      image ships install/ so the deployment's initContainer / a first-boot install can
+#      use install/phpbbcli.php; the MAIN container does NOT install (DDL is the
+#      initContainer's job), so here we remove install/ so the headless surface answers.
+#      (If this boot DID run an install — PHPBB_INSTALL_CONFIG set — removal is still
+#      correct, it has already completed above.)
+#
+#  (b) the compiled cache (cache/production) is purged so phpBB rebuilds it fresh as the
+#      serving user; otherwise a root-owned cache (written by the phpbbcli steps above)
+#      makes apache's www-data workers fail with "Unable to write to the cache directory".
+#
+#  (c) ownership of the writable trees is normalized — only when we have the privilege
+#      (the local image runs the entrypoint as root; on-cluster it runs as www-data with
+#      caps dropped, where the files are already www-data-owned and chown is neither
+#      possible nor needed).
+prepare_runtime_dirs() {
+    if [[ -d "install" ]]; then
+        rm -rf install \
+            && log "removed install/ (required: phpBB refuses to serve any route while install/ exists)" \
+            || log "WARNING: could not remove install/ — phpBB will report the board unavailable"
+    fi
+    rm -rf cache/production/* 2>/dev/null || true
+    if [[ "$(id -u)" == "0" ]]; then
+        chown -R www-data:www-data cache store config.php 2>/dev/null || true
+    fi
+}
+
+regenerate_config
+install_schema_if_needed
+# Re-derive config.php from env AFTER any install, so the running container always uses
+# the least-privilege app role (the installer may have written OWNER creds into it).
+regenerate_config
+enable_extension
+prepare_runtime_dirs
 
 # Warn loudly (but do not hard-fail) if the JWT config is absent — the extension fails
 # closed (401) at request time without it, so this is just an early operator signal.
 if [[ -z "${SNAPDRAGON_JWKS_URI:-}" || -z "${SNAPDRAGON_JWT_ISSUER:-}" ]]; then
-    echo "[snapdragon-entrypoint] WARNING: SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER not set — JWT validation will reject every request (fail-closed)"
+    log "WARNING: SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER not set — JWT validation will reject every request (fail-closed)"
 fi
 
 exec "$@"

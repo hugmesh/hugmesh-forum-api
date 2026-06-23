@@ -53,10 +53,14 @@ LABEL org.opencontainers.image.title="snapdragon-systems/phpbb" \
       org.opencontainers.image.source="https://github.com/Snapdragon-Systems/snapdragon-json-api"
 
 # phpBB runtime PHP extensions.
+# NOTE: pgsql is REQUIRED — the snapdragon-forum deployment runs phpBB against Postgres
+# ($dbms = phpbb\db\driver\postgres). Without the pgsql PHP extension phpBB cannot
+# connect to phpbb-db and the headless install/boot fails. libpq-dev provides its headers.
+# mysqli is kept only so the local docker-compose MySQL smoke still works.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpng-dev libjpeg-dev libfreetype6-dev libzip-dev default-mysql-client \
+    && apt-get install -y --no-install-recommends libpng-dev libjpeg-dev libfreetype6-dev libzip-dev libpq-dev default-mysql-client postgresql-client \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd mysqli zip opcache \
+    && docker-php-ext-install gd mysqli pgsql zip opcache \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
@@ -70,16 +74,62 @@ RUN printf '<Directory /var/www/html>\n    CGIPassAuth On\n</Directory>\n' \
         > /etc/apache2/conf-available/snapdragon-passauth.conf \
     && a2enconf snapdragon-passauth
 
+# Headless lockdown (image-level, deterministic): the ONLY PHP entrypoint that may run is
+# app.php (the Symfony front controller that dispatches the snapdragon/jsonapi routes).
+# Every other phpBB PHP script — index.php, ucp.php, posting.php, viewforum.php, the whole
+# adm/ ACP, etc. — is DENIED at the web-server layer, so a board/login/ACP page can never
+# be served even on the pod loopback. This is the in-image complement to the deployment's
+# NetworkPolicy + no-ingress (defense in depth) and replaces phpBB's own board_disable
+# config, which CANNOT be used here: phpBB enforces board_disable in $user->setup() inside
+# app.php BEFORE the extension dispatches, so it would also kill /api/v1/snapdragon/**.
+# The .htaccess front-controller rewrite (!-f !-d -> app.php) still routes the clean
+# /api/v1/snapdragon/** URLs into app.php, which is allow-listed below.
+RUN printf '%s\n' \
+        '<FilesMatch "\.php$">' \
+        '    Require all denied' \
+        '</FilesMatch>' \
+        '<Files "app.php">' \
+        '    Require all granted' \
+        '</Files>' \
+        > /etc/apache2/conf-available/snapdragon-lockdown.conf \
+    && a2enconf snapdragon-lockdown
+
+# ROOTLESS: bind apache on the NON-PRIVILEGED port 8080 (a non-root user cannot bind
+# <1024). The pod runs runAsNonRoot + runAsUser 33 + capabilities.drop:["ALL"] with NO
+# CAP_NET_BIND_SERVICE, so port 80 is impossible; 8080 lets www-data (UID 33) bind it.
+# Rewrite Listen 80 -> 8080 and the default vhost *:80 -> *:8080. The Service maps its
+# port 80 -> targetPort 8080 so the in-cluster ClusterIP contract (forum-bff baseUrl
+# ...svc.cluster.local:80) is unchanged.
+RUN sed -ri 's/^Listen 80$/Listen 8080/' /etc/apache2/ports.conf \
+    && sed -ri 's!\*:80>!*:8080>!' /etc/apache2/sites-available/000-default.conf \
+    && grep -q '^Listen 8080$' /etc/apache2/ports.conf \
+    && grep -q '\*:8080>' /etc/apache2/sites-available/000-default.conf
+
 ENV PHPBB_EXTENSION=snapdragon/jsonapi \
     APACHE_DOCUMENT_ROOT=/var/www/html
 
 COPY --from=build /opt/phpbb/ /var/www/html/
 COPY docker/entrypoint.sh /usr/local/bin/snapdragon-entrypoint.sh
 
-RUN chown -R www-data:www-data /var/www/html \
+# ROOTLESS ownership: everything apache writes at RUNTIME is owned by the runtime user
+# (www-data == UID/GID 33) at BUILD time, so under runAsNonRoot the per-boot entrypoint
+# never needs to chown (its chown is already guarded to root-only and simply no-ops).
+#   * the doc root (so config.php — regenerated from env each boot — is writable, and the
+#     phpBB compiled cache/ + store/ are writable);
+#   * the apache pid/log/lock dirs (so the master process can start as www-data: the base
+#     image already makes /var/run/apache2 + /var/log/apache2 www-data-owned, but we set
+#     them explicitly to be robust);
+#   * the front-controller cache is pre-purged so it rebuilds cleanly as UID 33.
+RUN chown -R www-data:www-data /var/www/html /var/run/apache2 /var/log/apache2 \
+    && rm -rf /var/www/html/cache/production \
+    && chmod -R u+rwX /var/www/html/cache /var/www/html/store \
     && chmod +x /usr/local/bin/snapdragon-entrypoint.sh
 
-EXPOSE 80
+# Run as the non-root runtime user by default (the pod also pins runAsUser 33). apache's
+# master process then starts as www-data and binds 8080 without any privilege.
+USER 33:33
+
+EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/snapdragon-entrypoint.sh"]
 CMD ["apache2-foreground"]
