@@ -4,6 +4,16 @@
 # PhpbbApiClient / PhpbbAdminClient call). Symfony routing (phpBB 3.3 / HttpKernel).
 # _controller references service.id:method (single colon).
 
+# ── Health (UNAUTHENTICATED — k8s liveness/readiness probe) ─────────────
+# The deployment probes this path with no JWT; it must answer 200 without auth.
+# Safe: ClusterIP-only + NetworkPolicy-locked Service, static body, no DB/forum data.
+
+snapdragon_jsonapi_health:
+    path: /api/v1/snapdragon/health
+    methods: [GET]
+    defaults:
+        _controller: snapdragon.jsonapi.controller.read:health
+
 # ── Reads (any authenticated user) ──────────────────────────────────────
 
 snapdragon_jsonapi_categories:
