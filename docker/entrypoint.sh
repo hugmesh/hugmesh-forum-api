@@ -3,7 +3,7 @@
 # Snapdragon phpBB entrypoint.
 #
 # On first boot (when phpBB is installed and a DB is reachable) it enables the
-# snapdragon/json-api extension via phpbbcli, so the /api/v1/snapdragon/** routes are
+# snapdragon/jsonapi extension via phpbbcli, so the /api/v1/snapdragon/** routes are
 # live. It is idempotent: re-enabling an already-enabled extension is a no-op. If phpBB
 # is not yet installed (no config.php), it skips enabling and lets the operator run the
 # phpBB installer first.
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 PHPBB_ROOT="${PHPBB_ROOT:-/var/www/html}"
-EXT_NAME="${PHPBB_EXTENSION:-snapdragon/json-api}"
+EXT_NAME="${PHPBB_EXTENSION:-snapdragon/jsonapi}"
 
 cd "$PHPBB_ROOT"
 

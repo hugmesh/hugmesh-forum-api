@@ -140,7 +140,7 @@ The `Dockerfile` produces `snapdragon-systems/phpbb:dev`: official phpBB 3.3 on
 `firebase/php-jwt`, and an entrypoint that enables the extension via `phpbbcli` on first
 boot. The deployment
 (`snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`snapdragon-forum`) sets `PHPBB_EXTENSION=snapdragon/json-api`, injects
+`snapdragon-forum`) sets `PHPBB_EXTENSION=snapdragon/jsonapi`, injects
 `SNAPDRAGON_JWKS_URI` / `SNAPDRAGON_JWT_ISSUER` from a Secret, locks down native
 login/ACP, and points the forum-bff WebClient at
 `http://phpbb.snapdragon-forum.svc.cluster.local:80`.
@@ -153,7 +153,7 @@ mkdir -p snapdragon/jsonapi
 # copy this repo's contents into snapdragon/jsonapi/
 cd snapdragon/jsonapi && composer install --no-dev
 cd /path/to/phpBB
-php bin/phpbbcli.php extension:enable snapdragon/json-api
+php bin/phpbbcli.php extension:enable snapdragon/jsonapi
 # set SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER in the web server environment
 ```
 

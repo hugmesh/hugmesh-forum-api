@@ -41,7 +41,7 @@ services:
             db:
                 condition: service_healthy
         environment:
-            PHPBB_EXTENSION: snapdragon/json-api
+            PHPBB_EXTENSION: snapdragon/jsonapi
             # Point these at a dev Casdoor. With no live Casdoor the extension fails
             # closed (every request -> 401), which proves the JWT gate.
             SNAPDRAGON_JWKS_URI: "${SNAPDRAGON_JWKS_URI:-https://casdoor.dev.local/.well-known/jwks}"

@@ -8,7 +8,7 @@
 #     otherwise enabled on first boot by the entrypoint.
 #
 # The deployment (snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml) sets:
-#   PHPBB_EXTENSION=snapdragon/json-api
+#   PHPBB_EXTENSION=snapdragon/jsonapi
 #   SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER  (Casdoor JWKS issuer ref; via Secret)
 # and locks down native login/ACP. Routes are served under app.php/api/v1/snapdragon/**.
 
@@ -60,7 +60,7 @@ RUN apt-get update \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PHPBB_EXTENSION=snapdragon/json-api \
+ENV PHPBB_EXTENSION=snapdragon/jsonapi \
     APACHE_DOCUMENT_ROOT=/var/www/html
 
 COPY --from=build /opt/phpbb/ /var/www/html/

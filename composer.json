@@ -1,6 +1,7 @@
 {
-    "name": "snapdragon/json-api",
+    "name": "snapdragon/jsonapi",
     "type": "phpbb-extension",
+    "version": "1.0.0",
     "description": "phpBB 3.3 headless JSON API extension (snapdragon/json-api) — the forum-bff backend. Registers /api/v1/snapdragon/** routes that validate the Casdoor JWT, re-derive authority server-side, and act-as-user through phpBB's own submit_post / content_visibility / group services.",
     "homepage": "https://github.com/Snapdragon-Systems/snapdragon-json-api",
     "time": "2026-06-22",
