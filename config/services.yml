@@ -67,11 +67,16 @@ services:
             - '%core.php_ext%'
 
     # ── controllers ──────────────────────────────────────────────────
+    # @symfony_request is phpBB's own Symfony Request (built from the phpBB request, which
+    # retains the real GET/POST/SERVER/headers). It MUST be injected instead of calling
+    # Request::createFromGlobals(), because phpBB deactivates the PHP superglobals and
+    # createFromGlobals() then throws a TypeError on every request.
     snapdragon.jsonapi.controller.read:
         class: snapdragon\jsonapi\controller\read_controller
         arguments:
             - '@snapdragon.jsonapi.auth.authenticator'
             - '@snapdragon.jsonapi.service.forum_repository'
+            - '@symfony_request'
 
     snapdragon.jsonapi.controller.write:
         class: snapdragon\jsonapi\controller\write_controller
@@ -81,6 +86,7 @@ services:
             - '@snapdragon.jsonapi.service.posting_service'
             - '@snapdragon.jsonapi.service.user_mapper'
             - '@snapdragon.jsonapi.config_provider'
+            - '@symfony_request'
 
     snapdragon.jsonapi.controller.admin:
         class: snapdragon\jsonapi\controller\admin_controller
@@ -90,3 +96,4 @@ services:
             - '@snapdragon.jsonapi.service.forum_repository'
             - '@snapdragon.jsonapi.service.admin_service'
             - '@snapdragon.jsonapi.service.posting_service'
+            - '@symfony_request'

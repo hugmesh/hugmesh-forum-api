@@ -11,6 +11,7 @@ namespace snapdragon\jsonapi\controller;
 use snapdragon\jsonapi\auth\authenticator;
 use snapdragon\jsonapi\auth\auth_exception;
 use snapdragon\jsonapi\service\forum_repository;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * GET /categories, /topics, /topics/{id}, /topics/{id}/replies, /posts/{id}, /stats.
@@ -26,10 +27,11 @@ class read_controller extends base_controller
     /**
      * @param authenticator    $authenticator
      * @param forum_repository $repo
+     * @param Request|null     $request The injected phpBB @symfony_request.
      */
-    public function __construct(authenticator $authenticator, forum_repository $repo)
+    public function __construct(authenticator $authenticator, forum_repository $repo, Request $request = null)
     {
-        parent::__construct($authenticator);
+        parent::__construct($authenticator, $request);
         $this->repo = $repo;
     }
 

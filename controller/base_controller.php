@@ -27,11 +27,24 @@ abstract class base_controller
     protected $authenticator;
 
     /**
-     * @param authenticator $authenticator
+     * @var Request|null The phpBB-provided Symfony request (@symfony_request). phpBB
+     *                   DEACTIVATES the PHP superglobals ($_GET/$_POST/... become
+     *                   phpbb\request\deactivated_super_global objects), so
+     *                   Request::createFromGlobals() throws a TypeError at runtime; we must
+     *                   use phpBB's own request object instead.
      */
-    public function __construct(authenticator $authenticator)
+    protected $request;
+
+    /**
+     * @param authenticator $authenticator
+     * @param Request|null  $request The injected phpBB @symfony_request (real GET/POST/
+     *                               SERVER/headers). Optional only so the unit tests can
+     *                               construct controllers without the phpBB container.
+     */
+    public function __construct(authenticator $authenticator, Request $request = null)
     {
         $this->authenticator = $authenticator;
+        $this->request = $request;
     }
 
     /**
@@ -47,10 +60,20 @@ abstract class base_controller
     }
 
     /**
+     * The current request. Prefer the injected phpBB @symfony_request: phpBB deactivates
+     * the PHP superglobals, so {@see Request::createFromGlobals()} throws
+     * "Argument #1 ($query) must be of type array, phpbb\request\deactivated_super_global
+     * given". createFromGlobals() is only ever a last-resort fallback for a non-phpBB
+     * (e.g. unit-test) context where the superglobals are intact.
+     *
      * @return Request
      */
     protected function current_request()
     {
+        if ($this->request !== null)
+        {
+            return $this->request;
+        }
         return Request::createFromGlobals();
     }
 

@@ -14,6 +14,7 @@ use snapdragon\jsonapi\service\admin_service;
 use snapdragon\jsonapi\service\forum_repository;
 use snapdragon\jsonapi\service\posting_service;
 use snapdragon\jsonapi\service\user_mapper;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Admin surface. Every action re-derives ROLE_ADMIN from the verified JWT (fail-closed)
@@ -59,10 +60,11 @@ class admin_controller extends base_controller
      * @param forum_repository $repo
      * @param admin_service    $admin
      * @param posting_service  $posting
+     * @param Request|null     $request The injected phpBB @symfony_request.
      */
-    public function __construct(authenticator $authenticator, user_mapper $users, forum_repository $repo, admin_service $admin, posting_service $posting)
+    public function __construct(authenticator $authenticator, user_mapper $users, forum_repository $repo, admin_service $admin, posting_service $posting, Request $request = null)
     {
-        parent::__construct($authenticator);
+        parent::__construct($authenticator, $request);
         $this->users = $users;
         $this->repo = $repo;
         $this->admin = $admin;

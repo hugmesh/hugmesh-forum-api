@@ -233,17 +233,65 @@ class admin_service
         {
             include($this->root_path . 'includes/acp/acp_forums.' . $this->php_ext);
         }
+        // acp_forums::update_forum_data() calls validate_range() (and other ACP helpers)
+        // from includes/functions_acp.php, which is NOT autoloaded in the headless API
+        // request path — without it the call fatals with "Call to undefined function
+        // validate_range()". The phpBB request globals it also relies on ($db/$user/$cache/
+        // $phpbb_container/$phpbb_dispatcher/$phpbb_log/$request) ARE populated inside an
+        // app.php request, so loading this function file is the only missing dependency.
+        if (!function_exists('validate_range'))
+        {
+            include($this->root_path . 'includes/functions_acp.' . $this->php_ext);
+        }
 
         $forum_post = defined('FORUM_POST') ? FORUM_POST : 1;
 
+        // acp_forums::update_forum_data() reads the FULL forum_data key set that the ACP
+        // "add forum" form posts; any missing key raises "Undefined array key" warnings
+        // (which emit output before headers and 500 the JSON response). We must seed every
+        // key it touches with the same defaults the ACP form uses (acp_forums.php "add").
         $forum_data = [
-            'parent_id'              => (int) $parent_id,
-            'forum_type'             => (int) $forum_post,
-            'forum_name'             => (string) $name,
-            'forum_desc'             => (string) $description,
-            'forum_status'           => defined('ITEM_UNLOCKED') ? ITEM_UNLOCKED : 0,
-            'forum_parents'          => '',
-            'forum_password'         => '',
+            'parent_id'               => (int) $parent_id,
+            'forum_type'              => (int) $forum_post,
+            'type_action'             => '',
+            'forum_status'            => defined('ITEM_UNLOCKED') ? ITEM_UNLOCKED : 0,
+            'forum_parents'           => '',
+            'forum_name'              => (string) $name,
+            'forum_link'              => '',
+            'forum_link_track'        => false,
+            'forum_desc'              => (string) $description,
+            'forum_desc_uid'          => '',
+            'forum_desc_options'      => 7,
+            'forum_desc_bitfield'     => '',
+            'forum_rules'             => '',
+            'forum_rules_uid'         => '',
+            'forum_rules_options'     => 7,
+            'forum_rules_bitfield'    => '',
+            'forum_rules_link'        => '',
+            'forum_image'             => '',
+            'forum_style'             => 0,
+            'display_subforum_list'   => true,
+            'display_subforum_limit'  => false,
+            'display_on_index'        => true,
+            'forum_topics_per_page'   => 0,
+            'enable_indexing'         => true,
+            'enable_icons'            => true,
+            'enable_prune'            => false,
+            'enable_post_review'      => true,
+            'enable_quick_reply'      => false,
+            'enable_shadow_prune'     => false,
+            'show_active'             => false,
+            'prune_days'              => 7,
+            'prune_viewed'            => 7,
+            'prune_freq'              => 1,
+            'prune_old_polls'         => false,
+            'prune_announce'          => false,
+            'prune_sticky'            => false,
+            'prune_shadow_days'       => 7,
+            'prune_shadow_freq'       => 1,
+            'forum_password'          => '',
+            'forum_password_confirm'  => '',
+            'forum_password_unset'    => false,
         ];
 
         $manager = new \acp_forums();

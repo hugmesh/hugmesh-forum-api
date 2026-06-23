@@ -173,6 +173,11 @@ class posting_service
         $data['topic_posts_approved'] = (int) $topic_row['topic_posts_approved'];
         $data['topic_posts_unapproved'] = (int) $topic_row['topic_posts_unapproved'];
         $data['topic_posts_softdeleted'] = (int) $topic_row['topic_posts_softdeleted'];
+        // submit_post('edit', ...) reads these to pick the edit sub-mode (edit_first_post /
+        // edit_last_post / edit); omitting them raises "Undefined array key" warnings that
+        // emit output before headers and corrupt the JSON response.
+        $data['topic_first_post_id'] = (int) $topic_row['topic_first_post_id'];
+        $data['topic_last_post_id'] = (int) $topic_row['topic_last_post_id'];
 
         $this->as_user($poster_id, function () use ($post_row, $username, $data) {
             $poll = [];

@@ -14,6 +14,7 @@ use snapdragon\jsonapi\config_provider;
 use snapdragon\jsonapi\service\forum_repository;
 use snapdragon\jsonapi\service\posting_service;
 use snapdragon\jsonapi\service\user_mapper;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * POST /topics, POST /topics/{id}/replies, PUT /posts/{id}, DELETE /posts/{id},
@@ -51,10 +52,11 @@ class write_controller extends base_controller
      * @param posting_service  $posting
      * @param user_mapper      $users
      * @param config_provider  $cfg
+     * @param Request|null     $request The injected phpBB @symfony_request.
      */
-    public function __construct(authenticator $authenticator, forum_repository $repo, posting_service $posting, user_mapper $users, config_provider $cfg)
+    public function __construct(authenticator $authenticator, forum_repository $repo, posting_service $posting, user_mapper $users, config_provider $cfg, Request $request = null)
     {
-        parent::__construct($authenticator);
+        parent::__construct($authenticator, $request);
         $this->repo = $repo;
         $this->posting = $posting;
         $this->users = $users;

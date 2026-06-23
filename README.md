@@ -8,8 +8,12 @@ services (`submit_post()`, `content_visibility`, the group functions, `user_add(
 permission/consistency logic is never bypassed and the schema is version-locked to the
 install.
 
-Installs at `ext/snapdragon/jsonapi/` (composer name `snapdragon/json-api`; the package
-directory drops the hyphen, PHP namespace `snapdragon\jsonapi`).
+Installs at `ext/snapdragon/jsonapi/` (composer name `snapdragon/jsonapi`, PHP namespace
+`snapdragon\jsonapi`). The composer `name` MUST equal the install directory path and may
+contain no hyphen: phpBB validates the extension name against
+`^[A-Za-z0-9_]{2,}/[A-Za-z0-9_]{2,}$` and requires `name == ext/<dir>` — a hyphenated
+`snapdragon/json-api` is silently un-enableable (`extension:enable` reports "does not
+exist").
 
 ---
 

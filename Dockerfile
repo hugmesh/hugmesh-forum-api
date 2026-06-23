@@ -60,6 +60,16 @@ RUN apt-get update \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
+# Pass the HTTP Authorization header through to PHP. With mod_php, apache strips it by
+# default (and phpBB ships the HTTP_AUTHORIZATION .htaccess rewrite commented out), so the
+# `Authorization: Bearer <jwt>` header never reaches the extension — leaving ONLY the
+# X-Snapdragon-JWT header to authenticate and silently disabling the dual-header
+# agreement (header-confusion) check. CGIPassAuth makes the Bearer header available so the
+# extension sees both headers and enforces that they match.
+RUN printf '<Directory /var/www/html>\n    CGIPassAuth On\n</Directory>\n' \
+        > /etc/apache2/conf-available/snapdragon-passauth.conf \
+    && a2enconf snapdragon-passauth
+
 ENV PHPBB_EXTENSION=snapdragon/jsonapi \
     APACHE_DOCUMENT_ROOT=/var/www/html
 
