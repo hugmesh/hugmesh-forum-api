@@ -21,16 +21,18 @@ use Symfony\Component\HttpFoundation\Request;
  * — caller-supplied group/role data in the body is NEVER trusted as authority.
  *
  * Endpoints:
- *  - POST /users/{sub}/ensure         -> ForumUser
- *  - PUT  /users/{sub}/groups         (GroupAssignment) -> 204
- *  - POST /admin/styles               (["name"]) -> 204
- *  - POST /admin/extensions           (["name"]) -> 204
- *  - GET  /admin/users                -> ForumUser[]
- *  - GET  /admin/users/{sub}          -> ForumUser
- *  - POST /admin/categories           (CreateCategory) -> Category
- *  - GET  /admin/moderation-queue     -> QueueItem[]
- *  - POST /admin/moderation/{id}/approve -> 204
- *  - POST /admin/moderation/{id}/reject  -> 204
+ *  - POST   /users/{sub}/ensure              -> ForumUser
+ *  - PUT    /users/{sub}/groups              (GroupAssignment) -> 204
+ *  - POST   /admin/styles                    (["name"]) -> 204
+ *  - POST   /admin/extensions                (["name"]) -> 204
+ *  - GET    /admin/users                     -> ForumUser[]
+ *  - GET    /admin/users/{sub}               -> ForumUser
+ *  - POST   /admin/categories                (CreateCategory) -> Category
+ *  - GET    /admin/moderation-queue          -> QueueItem[]
+ *  - POST   /admin/moderation/{id}/approve   -> 204
+ *  - POST   /admin/moderation/{id}/reject    -> 204
+ *  - POST   /admin/users/{sub}/ban           (BanRequest{reason}) -> 204
+ *  - DELETE /admin/users/{sub}/ban           -> 204
  */
 class admin_controller extends base_controller
 {
@@ -263,6 +265,43 @@ class admin_controller extends base_controller
             }
             $actor_id = $this->users->ensure_user($caller);
             $this->posting->reject_post($post_row, $topic_row, $actor_id);
+            return $this->no_content();
+        });
+    }
+
+    /**
+     * POST /admin/users/{sub}/ban (BanRequest{reason?}) -> 204.
+     *
+     * Adds the user to phpbb_banlist, sets user_type=3 (USER_IGNORE), removes
+     * non-REGISTERED group memberships, and kills active sessions. Idempotent on repeat.
+     *
+     * @param string $sub The Casdoor subject of the user to ban.
+     */
+    public function ban_user($sub)
+    {
+        return $this->guard(function () use ($sub) {
+            $this->authenticator->require_admin($this->principal());
+            $body   = $this->json_body();
+            $reason = isset($body['reason']) && is_string($body['reason']) ? $body['reason'] : '';
+            $this->admin->ban_user((string) $sub, $reason);
+            return $this->no_content();
+        });
+    }
+
+    /**
+     * DELETE /admin/users/{sub}/ban -> 204.
+     *
+     * Lifts the ban: removes the banlist entry, restores user_type=0 (USER_NORMAL),
+     * ensures REGISTERED-group floor membership, and kills stale sessions (force re-login).
+     * Higher-role groups are restored on the next set_groups sync from admin-bff.
+     *
+     * @param string $sub The Casdoor subject of the user to unban.
+     */
+    public function unban_user($sub)
+    {
+        return $this->guard(function () use ($sub) {
+            $this->authenticator->require_admin($this->principal());
+            $this->admin->unban_user((string) $sub);
             return $this->no_content();
         });
     }

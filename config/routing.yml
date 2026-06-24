@@ -169,3 +169,19 @@ snapdragon_jsonapi_admin_moderation_reject:
         _controller: snapdragon.jsonapi.controller.admin:reject
     requirements:
         id: \d+
+
+snapdragon_jsonapi_admin_ban_user:
+    path: /api/v1/snapdragon/admin/users/{sub}/ban
+    methods: [POST]
+    defaults:
+        _controller: snapdragon.jsonapi.controller.admin:ban_user
+    requirements:
+        sub: '[^/]+'
+
+snapdragon_jsonapi_admin_unban_user:
+    path: /api/v1/snapdragon/admin/users/{sub}/ban
+    methods: [DELETE]
+    defaults:
+        _controller: snapdragon.jsonapi.controller.admin:unban_user
+    requirements:
+        sub: '[^/]+'
