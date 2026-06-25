@@ -6,9 +6,8 @@
 #
 # Usage:
 #   docker compose up --build
-#   # then open http://localhost:8080 and run the phpBB web installer (DB host=db,
-#   # name=phpbb, user=phpbb, pass=phpbb). After install, restart the phpbb service so
-#   # the entrypoint enables snapdragon/json-api, then exercise:
+#   # then set PHPBB_INSTALL_CONFIG=1 on first run so the entrypoint runs the headless
+#   # installer, or let the bootstrap container handle DDL. Once up, exercise:
 #   #   GET  http://localhost:8080/app.php/api/v1/snapdragon/stats
 #   #        -H "Authorization: Bearer <casdoor-jwt>" -H "X-Snapdragon-JWT: <casdoor-jwt>"
 #   #   POST http://localhost:8080/app.php/api/v1/snapdragon/topics  (CreateTopic body)
@@ -48,7 +47,7 @@ services:
             SNAPDRAGON_JWT_ISSUER: "${SNAPDRAGON_JWT_ISSUER:-https://casdoor.dev.local}"
             SNAPDRAGON_JWT_AUDIENCE: "${SNAPDRAGON_JWT_AUDIENCE:-}"
         ports:
-            - "8080:80"
+            - "8080:8080"
 
 volumes:
     db_data:
