@@ -60,6 +60,8 @@ match the forum-bff Jackson records exactly; timestamps are ISO-8601 strings.
 | GET | `/admin/moderation-queue` | — | `QueueItem[]` | ADMIN |
 | POST | `/admin/moderation/{id}/approve` | — | 204 | ADMIN |
 | POST | `/admin/moderation/{id}/reject` | — | 204 | ADMIN |
+| POST | `/admin/users/{sub}/ban` | — | 204 | ADMIN |
+| DELETE | `/admin/users/{sub}/ban` | — | 204 | ADMIN |
 
 ### JSON shapes
 
@@ -236,23 +238,24 @@ runner). (No GitHub Actions — this org uses GitLab CI.)
   and the unauthenticated `/health` probe returns `200`.
 
 **NOT yet live-proven:** end-to-end authed HTTP posting **through the route on a
-cluster-shaped (pgsql, init→main split) harness**. This is gated by phpBB board-level
-bring-up nuances — `$user->setup()` runs **before** the extension dispatches and fails
-closed with *"this board is currently unavailable"* for **every** route (including
-`/health`) while `install/` exists, and the `board_disable` flag has the same
-all-route reach. It is a **bootstrap/lockdown** concern, **not an extension bug**; the
-fix lives in the entrypoint/Dockerfile (remove `install/`; Apache-level lockdown instead
-of `board_disable`) — see the in-flight forum go-live PR.
+cluster-shaped (pgsql, init→main split) harness**. The bootstrap/lockdown concerns were
+resolved in the entrypoint rewrite (PR #7): the entrypoint regenerates `config.php` from
+env every boot, removes `install/` before serving, runs Apache rootless on port 8080, and
+includes the pgsql driver. The remaining live-prove gap is end-to-end authed HTTP posting
+on the cluster-shaped pgsql harness; this is a kubeadm/generator follow-up, not an
+extension bug.
 
 **Generator follow-ups for true on-cluster go-live:**
 
 - `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
   **`snapdragon/jsonapi`** name (no hyphen) and run the **`snapdragon-systems/phpbb:dev`**
   image this repo builds.
-- Keep the board locked down via the image-level Apache lockdown / NetworkPolicy (the
-  `board_disable`-vs-API-exemption tension above), not the board-disable flag.
-- The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) vs. binding port 80 /
-  entrypoint chown needs reconciliation for a true non-priv on-cluster run.
+- Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
+  board-disable flag.
+- The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) is **resolved**: Apache now
+  binds port 8080 (non-privileged), the image defaults to `USER 33:33` at build time, and
+  the two-container harness confirmed `runAsNonRoot` + `capabilities.drop:[ALL]` works. The
+  Service maps port 80 → targetPort 8080.
 
 This extension is the previously-"unbuilt external contract" the forum-bff
 (`snapdragon-forum-bff-api`) `PhpbbApiClient` was written against — now built. Flipping
