@@ -56,7 +56,9 @@ LABEL org.opencontainers.image.title="snapdragon-systems/phpbb" \
 # NOTE: pgsql is REQUIRED — the snapdragon-forum deployment runs phpBB against Postgres
 # ($dbms = phpbb\db\driver\postgres). Without the pgsql PHP extension phpBB cannot
 # connect to phpbb-db and the headless install/boot fails. libpq-dev provides its headers.
-# mysqli is kept only so the local docker-compose MySQL smoke still works.
+# mysqli is kept for operators running a MANUAL MySQL-backed install only — the local
+# docker-compose smoke is now cluster-shaped Postgres (the entrypoint's DDL-once schema
+# probe is pgsql, so the headless install path requires Postgres).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpng-dev libjpeg-dev libfreetype6-dev libzip-dev libpq-dev default-mysql-client postgresql-client \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \

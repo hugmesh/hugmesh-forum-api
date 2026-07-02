@@ -1,0 +1,41 @@
+# Headless phpBB install YAML for the LOCAL docker-compose smoke harness ONLY.
+#
+# DEV-ONLY LITERALS: every credential below (phpbb/phpbb, sysadmin/adminadmin) is a
+# throwaway local-compose value — nothing here is used on-cluster. The on-cluster
+# install YAML lives in snapdragon-generator (specs/cluster/manifests/forum/phpbb.yaml,
+# ConfigMap phpbb-config `install-config.yml`) and renders its creds from Secrets.
+#
+# Consumed by the image entrypoint when the compose file sets
+#   PHPBB_INSTALL_CONFIG=/var/www/html/ext/snapdragon/jsonapi/docker/install-config.compose.yml
+# on an EMPTY Postgres: the entrypoint probes <prefix>config (pgsql), runs
+# `php install/phpbbcli.php install <this file> -n` once (DDL-once), then removes
+# install/ and serves. Schema = phpbb/install/installer_configuration.php
+# (same shape the generator's install-config.yml validated against phpBB 3.3.11).
+installer:
+    admin:
+        name: sysadmin
+        password: adminadmin
+        email: admin@example.com
+    board:
+        lang: en
+        name: 'Snapdragon Forum (compose smoke)'
+        description: 'Local cluster-shaped smoke harness (headless via snapdragon/jsonapi)'
+    database:
+        dbms: postgres
+        dbhost: db
+        dbport: 5432
+        dbuser: phpbb
+        dbpasswd: phpbb
+        dbname: phpbb
+        table_prefix: phpbb_
+    email:
+        enabled: false
+    server:
+        cookie_secure: false
+        server_protocol: 'http://'
+        force_server_vars: false
+        server_name: localhost
+        server_port: 8080
+        script_path: /
+    extensions:
+        - snapdragon/jsonapi

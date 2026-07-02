@@ -133,9 +133,13 @@ install_schema_if_needed() {
     case "$rc" in
         0) log "DB schema already present (<prefix>config exists) — NOT re-installing (DDL-once honored)"; return 0 ;;
         1) log "DB reachable but empty — running headless install ${PHPBB_INSTALL_CONFIG} (DDL once, OWNER creds from the YAML)"
-           # The headless installer writes config.php too, but we re-derive it from env
-           # afterwards (step 1 re-runs below) so the MAIN container always uses the
-           # least-privilege app role, never the OWNER creds in the install YAML.
+           # The installer REFUSES to run when config.php is non-empty (it defines
+           # PHPBB_INSTALLED -> "phpBB is already installed."), and step 1 above has
+           # already regenerated config.php from env. The DB probe just proved the
+           # schema is NOT there, so that config is describing a not-yet-installed
+           # board: truncate it back to the shipped 0-byte state so the installer
+           # runs. It writes its own config.php; we then re-derive from env below.
+           : > config.php
            php install/phpbbcli.php install "${PHPBB_INSTALL_CONFIG}" -n
            log "headless install complete"
            ;;

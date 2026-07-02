@@ -209,12 +209,22 @@ wrong-issuer / wrong-audience rejected; authority re-derived from `roles`/`permi
 dual-header agreement; ownership/role gates.
 
 **Live phpBB smoke test** (the part unit tests cannot cover — real `submit_post()` /
-`content_visibility` / `user_add` against a real schema):
+`content_visibility` / `user_add` against a real schema). The harness is
+**cluster-shaped**: Postgres 16 (the same dbms the cluster deployment runs) and a fully
+**headless** bring-up — the phpBB web installer is unreachable by design (the image's
+Apache lockdown denies every `.php` except `app.php`, and the entrypoint removes
+`install/` before serving):
 
 ```bash
-docker compose up --build      # phpBB 3.3 + MySQL with this extension
-# run the phpBB web installer at http://localhost:8080, restart phpbb, then exercise
-# /app.php/api/v1/snapdragon/** with a Casdoor JWT.
+docker compose up --build
+# First boot: the entrypoint probes the empty Postgres and runs the headless installer
+# with docker/install-config.compose.yml (DEV-ONLY literal creds; DDL-once guarded),
+# enables snapdragon/jsonapi, removes install/, and serves rootless on :8080. Then:
+curl -i http://localhost:8080/app.php/api/v1/snapdragon/health          # 200, no JWT
+curl -i http://localhost:8080/app.php/api/v1/snapdragon/stats           # 401 fail-closed
+curl -i http://localhost:8080/index.php                                 # 403 (lockdown)
+# ...and /app.php/api/v1/snapdragon/** with a Casdoor JWT for the authed contract.
+# Restarting the phpbb service must log "schema already present … NOT re-installing".
 ```
 
 CI is GitLab (`.gitlab-ci.yml`): `php -l` → `composer validate` → `phpunit` → **`build:image`**
