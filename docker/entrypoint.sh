@@ -21,7 +21,7 @@
 #   1. (re)generate config.php from env with the app-role creds;
 #   2. ensure the DB schema is installed (DDL-once, guarded by a table-existence probe;
 #      see SCHEMA INSTALL below) — does NOT re-install an already-installed board;
-#   3. enable the snapdragon/jsonapi extension (idempotent), so /api/v1/snapdragon/**
+#   3. enable the snapdragon/forumapi extension (idempotent), so /api/v1/snapdragon/**
 #      answers; then exec the CMD (apache2-foreground).
 #
 # EMPTY-CONFIG TRAP: phpBB 3.3.11 ships a 0-byte config.php baked into the release zip
@@ -53,7 +53,7 @@ set -euo pipefail
 log() { echo "[snapdragon-entrypoint] $*"; }
 
 PHPBB_ROOT="${PHPBB_ROOT:-/var/www/html}"
-EXT_NAME="${PHPBB_EXTENSION:-snapdragon/jsonapi}"
+EXT_NAME="${PHPBB_EXTENSION:-snapdragon/forumapi}"
 TABLE_PREFIX="${PHPBB_TABLE_PREFIX:-phpbb_}"
 
 cd "$PHPBB_ROOT"

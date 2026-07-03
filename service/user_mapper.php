@@ -1,14 +1,14 @@
 <?php
 /**
- * Snapdragon JSON API — Casdoor sub -> phpBB user resolution / creation / group sync.
+ * Snapdragon Forum API — Casdoor sub -> phpBB user resolution / creation / group sync.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\service;
+namespace snapdragon\forumapi\service;
 
-use snapdragon\jsonapi\auth\principal;
+use snapdragon\forumapi\auth\principal;
 
 /**
  * Maps the immutable Casdoor {@code sub} to a phpBB {@code user_id} via the
@@ -173,7 +173,7 @@ class user_mapper
 
         if (!$user_id)
         {
-            throw new \RuntimeException('Snapdragon JSON API: user_add() failed for sub ' . $p->get_subject());
+            throw new \RuntimeException('Snapdragon Forum API: user_add() failed for sub ' . $p->get_subject());
         }
 
         return (int) $user_id;

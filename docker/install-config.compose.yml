@@ -6,7 +6,7 @@
 # ConfigMap phpbb-config `install-config.yml`) and renders its creds from Secrets.
 #
 # Consumed by the image entrypoint when the compose file sets
-#   PHPBB_INSTALL_CONFIG=/var/www/html/ext/snapdragon/jsonapi/docker/install-config.compose.yml
+#   PHPBB_INSTALL_CONFIG=/var/www/html/ext/snapdragon/forumapi/docker/install-config.compose.yml
 # on an EMPTY Postgres: the entrypoint probes <prefix>config (pgsql), runs
 # `php install/phpbbcli.php install <this file> -n` once (DDL-once), then removes
 # install/ and serves. Schema = phpbb/install/installer_configuration.php
@@ -19,7 +19,7 @@ installer:
     board:
         lang: en
         name: 'Snapdragon Forum (compose smoke)'
-        description: 'Local cluster-shaped smoke harness (headless via snapdragon/jsonapi)'
+        description: 'Local cluster-shaped smoke harness (headless via snapdragon/forumapi)'
     database:
         dbms: postgres
         dbhost: db
@@ -38,4 +38,4 @@ installer:
         server_port: 8080
         script_path: /
     extensions:
-        - snapdragon/jsonapi
+        - snapdragon/forumapi

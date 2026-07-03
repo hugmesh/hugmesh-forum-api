@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — JWKS provider.
+ * Snapdragon Forum API — JWKS provider.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\auth;
+namespace snapdragon\forumapi\auth;
 
 use Firebase\JWT\JWK;
 use Firebase\JWT\Key;
@@ -29,7 +29,7 @@ class jwks_provider
     /**
      * The cache key under which the parsed JWKS document is stored.
      */
-    public const CACHE_KEY = '_snapdragon_jsonapi_jwks';
+    public const CACHE_KEY = '_snapdragon_forumapi_jwks';
 
     /**
      * Cache TTL for the JWKS document, in seconds (rotation grace).
@@ -89,7 +89,7 @@ class jwks_provider
 
         if (!is_array($jwks) || empty($jwks['keys']))
         {
-            throw new \RuntimeException('Snapdragon JSON API: JWKS document is empty or malformed.');
+            throw new \RuntimeException('Snapdragon Forum API: JWKS document is empty or malformed.');
         }
 
         // JWK::parseKeySet() converts the JWKS array into a kid => Key map. Pin RS256 as
@@ -113,7 +113,7 @@ class jwks_provider
 
         if (empty($keys))
         {
-            throw new \RuntimeException('Snapdragon JSON API: JWKS contains no usable RS256 keys.');
+            throw new \RuntimeException('Snapdragon Forum API: JWKS contains no usable RS256 keys.');
         }
 
         $this->memo = $keys;
@@ -160,7 +160,7 @@ class jwks_provider
 
         if ($this->jwks_uri === '')
         {
-            throw new \RuntimeException('Snapdragon JSON API: no JWKS URI configured (SNAPDRAGON_JWKS_URI).');
+            throw new \RuntimeException('Snapdragon Forum API: no JWKS URI configured (SNAPDRAGON_JWKS_URI).');
         }
 
         $raw = call_user_func($this->fetcher, $this->jwks_uri);
@@ -168,7 +168,7 @@ class jwks_provider
 
         if (!is_array($doc))
         {
-            throw new \RuntimeException('Snapdragon JSON API: JWKS endpoint did not return valid JSON.');
+            throw new \RuntimeException('Snapdragon Forum API: JWKS endpoint did not return valid JSON.');
         }
 
         if ($this->cache !== null)
@@ -196,7 +196,7 @@ class jwks_provider
         // own keys), so we refuse anything that is not https:// outright.
         if (stripos((string) $url, 'https://') !== 0)
         {
-            throw new \RuntimeException('Snapdragon JSON API: JWKS URI must be an absolute https:// URL.');
+            throw new \RuntimeException('Snapdragon Forum API: JWKS URI must be an absolute https:// URL.');
         }
 
         if (function_exists('curl_init'))
@@ -216,7 +216,7 @@ class jwks_provider
 
             if ($body === false || $code < 200 || $code >= 300)
             {
-                throw new \RuntimeException('Snapdragon JSON API: JWKS fetch failed (HTTP ' . $code . ') ' . $err);
+                throw new \RuntimeException('Snapdragon Forum API: JWKS fetch failed (HTTP ' . $code . ') ' . $err);
             }
 
             return (string) $body;
@@ -238,7 +238,7 @@ class jwks_provider
 
         if ($body === false)
         {
-            throw new \RuntimeException('Snapdragon JSON API: JWKS fetch failed via file_get_contents.');
+            throw new \RuntimeException('Snapdragon Forum API: JWKS fetch failed via file_get_contents.');
         }
 
         return (string) $body;

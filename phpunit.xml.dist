@@ -7,7 +7,7 @@
          failOnRisky="true"
          beStrictAboutOutputDuringTests="true">
     <testsuites>
-        <testsuite name="snapdragon-json-api unit">
+        <testsuite name="snapdragon-forum-api unit">
             <directory suffix="_test.php">tests</directory>
         </testsuite>
     </testsuites>

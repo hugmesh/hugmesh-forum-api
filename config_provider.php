@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — runtime configuration provider (env-first, never committed).
+ * Snapdragon Forum API — runtime configuration provider (env-first, never committed).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi;
+namespace snapdragon\forumapi;
 
 /**
  * Resolves the extension's deployment configuration from environment variables, with an
@@ -49,10 +49,10 @@ class config_provider
      */
     public function jwks_uri()
     {
-        $uri = $this->resolve('SNAPDRAGON_JWKS_URI', 'snapdragon_jsonapi_jwks_uri', '');
+        $uri = $this->resolve('SNAPDRAGON_JWKS_URI', 'snapdragon_forumapi_jwks_uri', '');
         if ($uri !== '' && stripos($uri, 'https://') !== 0)
         {
-            throw new \RuntimeException('Snapdragon JSON API: SNAPDRAGON_JWKS_URI must be an absolute https:// URL.');
+            throw new \RuntimeException('Snapdragon Forum API: SNAPDRAGON_JWKS_URI must be an absolute https:// URL.');
         }
         return $uri;
     }
@@ -62,7 +62,7 @@ class config_provider
      */
     public function issuer()
     {
-        return $this->resolve('SNAPDRAGON_JWT_ISSUER', 'snapdragon_jsonapi_issuer', '');
+        return $this->resolve('SNAPDRAGON_JWT_ISSUER', 'snapdragon_forumapi_issuer', '');
     }
 
     /**
@@ -70,7 +70,7 @@ class config_provider
      */
     public function audience()
     {
-        return $this->resolve('SNAPDRAGON_JWT_AUDIENCE', 'snapdragon_jsonapi_audience', '');
+        return $this->resolve('SNAPDRAGON_JWT_AUDIENCE', 'snapdragon_forumapi_audience', '');
     }
 
     /**
@@ -78,7 +78,7 @@ class config_provider
      */
     public function leeway()
     {
-        return (int) $this->resolve('SNAPDRAGON_JWT_LEEWAY', 'snapdragon_jsonapi_leeway', '30');
+        return (int) $this->resolve('SNAPDRAGON_JWT_LEEWAY', 'snapdragon_forumapi_leeway', '30');
     }
 
     /**
@@ -86,7 +86,7 @@ class config_provider
      */
     public function default_forum_id()
     {
-        return (int) $this->resolve('SNAPDRAGON_DEFAULT_FORUM_ID', 'snapdragon_jsonapi_default_forum_id', '2');
+        return (int) $this->resolve('SNAPDRAGON_DEFAULT_FORUM_ID', 'snapdragon_forumapi_default_forum_id', '2');
     }
 
     /**

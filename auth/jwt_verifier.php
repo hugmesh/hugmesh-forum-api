@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — Casdoor JWT verifier + server-side authority re-derivation.
+ * Snapdragon Forum API — Casdoor JWT verifier + server-side authority re-derivation.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\auth;
+namespace snapdragon\forumapi\auth;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\ExpiredException;

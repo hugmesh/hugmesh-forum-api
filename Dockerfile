@@ -1,14 +1,14 @@
-# Snapdragon phpBB image with the snapdragon/json-api headless extension baked in.
+# Snapdragon phpBB image with the snapdragon/forum-api headless extension baked in.
 #
 # Produces the image the deployment references as `snapdragon-systems/phpbb:dev`:
 #   - official phpBB 3.3 on php:8.1-apache
-#   - this extension copied to ext/snapdragon/jsonapi/
+#   - this extension copied to ext/snapdragon/forumapi/
 #   - composer install for the extension's runtime dep (firebase/php-jwt)
 #   - the extension enabled (offline, via phpbbcli) at build time when a DB is present,
 #     otherwise enabled on first boot by the entrypoint.
 #
 # The deployment (snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml) sets:
-#   PHPBB_EXTENSION=snapdragon/jsonapi
+#   PHPBB_EXTENSION=snapdragon/forumapi
 #   SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER  (Casdoor JWKS issuer ref; via Secret)
 # and locks down native login/ACP. Routes are served under app.php/api/v1/snapdragon/**.
 
@@ -34,23 +34,23 @@ RUN curl -fsSL -o phpbb.zip "https://download.phpbb.com/pub/release/3.3/${PHPBB_
     && mv phpBB3 phpbb \
     && rm phpbb.zip
 
-# Copy the extension into ext/snapdragon/jsonapi/ (NOTE the de-hyphenated package dir).
-COPY . /opt/phpbb/ext/snapdragon/jsonapi/
+# Copy the extension into ext/snapdragon/forumapi/ (NOTE the de-hyphenated package dir).
+COPY . /opt/phpbb/ext/snapdragon/forumapi/
 
 # Resolve the extension's runtime dependency (firebase/php-jwt) into its own vendor dir
 # (phpBB autoloads ext/<vendor>/<pkg>/vendor/). Dev deps excluded from the image.
-WORKDIR /opt/phpbb/ext/snapdragon/jsonapi
+WORKDIR /opt/phpbb/ext/snapdragon/forumapi
 ENV COMPOSER_ALLOW_SUPERUSER=1
 RUN composer config --no-plugins allow-plugins.composer/installers true \
     && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && rm -rf /opt/phpbb/ext/snapdragon/jsonapi/.git
+    && rm -rf /opt/phpbb/ext/snapdragon/forumapi/.git
 
 # ---- stage 2: runtime ------------------------------------------------------
 FROM php:8.1-apache AS runtime
 
 LABEL org.opencontainers.image.title="snapdragon-systems/phpbb" \
-      org.opencontainers.image.description="phpBB 3.3 with the snapdragon/json-api headless extension" \
-      org.opencontainers.image.source="https://github.com/Snapdragon-Systems/snapdragon-json-api"
+      org.opencontainers.image.description="phpBB 3.3 with the snapdragon/forum-api headless extension" \
+      org.opencontainers.image.source="https://github.com/Snapdragon-Systems/snapdragon-forum-api"
 
 # phpBB runtime PHP extensions.
 # NOTE: pgsql is REQUIRED — the snapdragon-forum deployment runs phpBB against Postgres
@@ -77,7 +77,7 @@ RUN printf '<Directory /var/www/html>\n    CGIPassAuth On\n</Directory>\n' \
     && a2enconf snapdragon-passauth
 
 # Headless lockdown (image-level, deterministic): the ONLY PHP entrypoint that may run is
-# app.php (the Symfony front controller that dispatches the snapdragon/jsonapi routes).
+# app.php (the Symfony front controller that dispatches the snapdragon/forumapi routes).
 # Every other phpBB PHP script — index.php, ucp.php, posting.php, viewforum.php, the whole
 # adm/ ACP, etc. — is DENIED at the web-server layer, so a board/login/ACP page can never
 # be served even on the pod loopback. This is the in-image complement to the deployment's
@@ -107,7 +107,7 @@ RUN sed -ri 's/^Listen 80$/Listen 8080/' /etc/apache2/ports.conf \
     && grep -q '^Listen 8080$' /etc/apache2/ports.conf \
     && grep -q '\*:8080>' /etc/apache2/sites-available/000-default.conf
 
-ENV PHPBB_EXTENSION=snapdragon/jsonapi \
+ENV PHPBB_EXTENSION=snapdragon/forumapi \
     APACHE_DOCUMENT_ROOT=/var/www/html
 
 COPY --from=build /opt/phpbb/ /var/www/html/

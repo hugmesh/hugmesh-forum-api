@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — request authenticator (header extraction + verification + authz).
+ * Snapdragon Forum API — request authenticator (header extraction + verification + authz).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\auth;
+namespace snapdragon\forumapi\auth;
 
 use Symfony\Component\HttpFoundation\Request;
 

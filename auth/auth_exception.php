@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — auth/authorization exception carrying an HTTP status.
+ * Snapdragon Forum API — auth/authorization exception carrying an HTTP status.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\auth;
+namespace snapdragon\forumapi\auth;
 
 /**
  * A fail-closed authentication/authorization error. Carries the HTTP status code the

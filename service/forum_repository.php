@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — read-side repository mapping phpBB tables to the DTO shapes.
+ * Snapdragon Forum API — read-side repository mapping phpBB tables to the DTO shapes.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\service;
+namespace snapdragon\forumapi\service;
 
 /**
  * Reads phpBB forums/topics/posts/users via the injected DBAL connection and maps rows

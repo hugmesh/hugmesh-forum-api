@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — initial schema migration.
+ * Snapdragon Forum API — initial schema migration.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\migrations;
+namespace snapdragon\forumapi\migrations;
 
 /**
  * Creates the Casdoor-subject -> phpBB user_id mapping table.

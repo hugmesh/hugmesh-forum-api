@@ -1,15 +1,15 @@
 <?php
 /**
- * Snapdragon JSON API — phpBB 3.3 headless JSON API extension.
+ * Snapdragon Forum API — phpBB 3.3 headless Forum API extension.
  *
- * Installs at ext/snapdragon/jsonapi/ (composer name snapdragon/jsonapi — MUST equal the
+ * Installs at ext/snapdragon/forumapi/ (composer name snapdragon/forumapi — MUST equal the
  * directory path and contain no hyphen, or phpBB cannot enable it).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi;
+namespace snapdragon\forumapi;
 
 /**
  * The extension metadata / lifecycle class.

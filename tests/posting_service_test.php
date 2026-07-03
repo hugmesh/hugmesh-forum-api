@@ -18,10 +18,10 @@
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\tests;
+namespace snapdragon\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\jsonapi\service\posting_service;
+use snapdragon\forumapi\service\posting_service;
 
 /**
  * A fake phpBB $user: just the public ->data property the impersonation window reads and

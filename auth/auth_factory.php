@@ -1,14 +1,14 @@
 <?php
 /**
- * Snapdragon JSON API — auth factory (builds the JWKS provider + verifier + authenticator).
+ * Snapdragon Forum API — auth factory (builds the JWKS provider + verifier + authenticator).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\auth;
+namespace snapdragon\forumapi\auth;
 
-use snapdragon\jsonapi\config_provider;
+use snapdragon\forumapi\config_provider;
 
 /**
  * Constructs the auth chain from the runtime {@see config_provider} so the

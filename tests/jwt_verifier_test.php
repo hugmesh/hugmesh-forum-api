@@ -12,14 +12,14 @@
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\tests;
+namespace snapdragon\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\jsonapi\auth\auth_exception;
-use snapdragon\jsonapi\auth\authenticator;
-use snapdragon\jsonapi\auth\jwks_provider;
-use snapdragon\jsonapi\auth\jwt_verifier;
-use snapdragon\jsonapi\auth\principal;
+use snapdragon\forumapi\auth\auth_exception;
+use snapdragon\forumapi\auth\authenticator;
+use snapdragon\forumapi\auth\jwks_provider;
+use snapdragon\forumapi\auth\jwt_verifier;
+use snapdragon\forumapi\auth\principal;
 use Symfony\Component\HttpFoundation\Request;
 
 class jwt_verifier_test extends TestCase

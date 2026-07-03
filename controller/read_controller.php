@@ -1,16 +1,16 @@
 <?php
 /**
- * Snapdragon JSON API — read endpoints (any authenticated user).
+ * Snapdragon Forum API — read endpoints (any authenticated user).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\controller;
+namespace snapdragon\forumapi\controller;
 
-use snapdragon\jsonapi\auth\authenticator;
-use snapdragon\jsonapi\auth\auth_exception;
-use snapdragon\jsonapi\service\forum_repository;
+use snapdragon\forumapi\auth\authenticator;
+use snapdragon\forumapi\auth\auth_exception;
+use snapdragon\forumapi\service\forum_repository;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -55,7 +55,7 @@ class read_controller extends base_controller
     public function health()
     {
         return $this->guard(function () {
-            return $this->json(['status' => 'ok', 'service' => 'snapdragon-jsonapi']);
+            return $this->json(['status' => 'ok', 'service' => 'snapdragon-forumapi']);
         });
     }
 

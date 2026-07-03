@@ -1,4 +1,4 @@
-# Snapdragon JSON API — route definitions.
+# Snapdragon Forum API — route definitions.
 #
 # All paths are under the base /api/v1/snapdragon (the prefix the forum-bff
 # PhpbbApiClient / PhpbbAdminClient call). Symfony routing (phpBB 3.3 / HttpKernel).
@@ -8,180 +8,180 @@
 # The deployment probes this path with no JWT; it must answer 200 without auth.
 # Safe: ClusterIP-only + NetworkPolicy-locked Service, static body, no DB/forum data.
 
-snapdragon_jsonapi_health:
+snapdragon_forumapi_health:
     path: /api/v1/snapdragon/health
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:health
+        _controller: snapdragon.forumapi.controller.read:health
 
 # ── Reads (any authenticated user) ──────────────────────────────────────
 
-snapdragon_jsonapi_categories:
+snapdragon_forumapi_categories:
     path: /api/v1/snapdragon/categories
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:categories
+        _controller: snapdragon.forumapi.controller.read:categories
 
-snapdragon_jsonapi_topics:
+snapdragon_forumapi_topics:
     path: /api/v1/snapdragon/topics
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:topics
+        _controller: snapdragon.forumapi.controller.read:topics
 
-snapdragon_jsonapi_topic:
+snapdragon_forumapi_topic:
     path: /api/v1/snapdragon/topics/{id}
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:topic
+        _controller: snapdragon.forumapi.controller.read:topic
     requirements:
         id: \d+
 
-snapdragon_jsonapi_topic_replies:
+snapdragon_forumapi_topic_replies:
     path: /api/v1/snapdragon/topics/{id}/replies
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:replies
+        _controller: snapdragon.forumapi.controller.read:replies
     requirements:
         id: \d+
 
-snapdragon_jsonapi_post:
+snapdragon_forumapi_post:
     path: /api/v1/snapdragon/posts/{id}
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:post
+        _controller: snapdragon.forumapi.controller.read:post
     requirements:
         id: \d+
 
-snapdragon_jsonapi_stats:
+snapdragon_forumapi_stats:
     path: /api/v1/snapdragon/stats
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.read:stats
+        _controller: snapdragon.forumapi.controller.read:stats
 
 # ── Writes (acts-as-user; author = JWT sub) ─────────────────────────────
 
-snapdragon_jsonapi_create_topic:
+snapdragon_forumapi_create_topic:
     path: /api/v1/snapdragon/topics
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.write:create_topic
+        _controller: snapdragon.forumapi.controller.write:create_topic
 
-snapdragon_jsonapi_create_reply:
+snapdragon_forumapi_create_reply:
     path: /api/v1/snapdragon/topics/{id}/replies
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.write:create_reply
+        _controller: snapdragon.forumapi.controller.write:create_reply
     requirements:
         id: \d+
 
-snapdragon_jsonapi_edit_post:
+snapdragon_forumapi_edit_post:
     path: /api/v1/snapdragon/posts/{id}
     methods: [PUT]
     defaults:
-        _controller: snapdragon.jsonapi.controller.write:edit_post
+        _controller: snapdragon.forumapi.controller.write:edit_post
     requirements:
         id: \d+
 
-snapdragon_jsonapi_delete_post:
+snapdragon_forumapi_delete_post:
     path: /api/v1/snapdragon/posts/{id}
     methods: [DELETE]
     defaults:
-        _controller: snapdragon.jsonapi.controller.write:delete_post
+        _controller: snapdragon.forumapi.controller.write:delete_post
     requirements:
         id: \d+
 
-snapdragon_jsonapi_moderate_topic:
+snapdragon_forumapi_moderate_topic:
     path: /api/v1/snapdragon/moderation/topics/{id}
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.write:moderate_topic
+        _controller: snapdragon.forumapi.controller.write:moderate_topic
     requirements:
         id: \d+
 
 # ── Admin / declarative (ROLE_ADMIN) ────────────────────────────────────
 
-snapdragon_jsonapi_ensure_user:
+snapdragon_forumapi_ensure_user:
     path: /api/v1/snapdragon/users/{sub}/ensure
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:ensure_user
+        _controller: snapdragon.forumapi.controller.admin:ensure_user
     requirements:
         sub: '[^/]+'
 
-snapdragon_jsonapi_set_user_groups:
+snapdragon_forumapi_set_user_groups:
     path: /api/v1/snapdragon/users/{sub}/groups
     methods: [PUT]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:set_user_groups
+        _controller: snapdragon.forumapi.controller.admin:set_user_groups
     requirements:
         sub: '[^/]+'
 
-snapdragon_jsonapi_admin_styles:
+snapdragon_forumapi_admin_styles:
     path: /api/v1/snapdragon/admin/styles
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:install_style
+        _controller: snapdragon.forumapi.controller.admin:install_style
 
-snapdragon_jsonapi_admin_extensions:
+snapdragon_forumapi_admin_extensions:
     path: /api/v1/snapdragon/admin/extensions
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:install_extension
+        _controller: snapdragon.forumapi.controller.admin:install_extension
 
-snapdragon_jsonapi_admin_users:
+snapdragon_forumapi_admin_users:
     path: /api/v1/snapdragon/admin/users
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:list_users
+        _controller: snapdragon.forumapi.controller.admin:list_users
 
-snapdragon_jsonapi_admin_user:
+snapdragon_forumapi_admin_user:
     path: /api/v1/snapdragon/admin/users/{sub}
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:get_user
+        _controller: snapdragon.forumapi.controller.admin:get_user
     requirements:
         sub: '[^/]+'
 
-snapdragon_jsonapi_admin_categories:
+snapdragon_forumapi_admin_categories:
     path: /api/v1/snapdragon/admin/categories
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:create_category
+        _controller: snapdragon.forumapi.controller.admin:create_category
 
-snapdragon_jsonapi_admin_moderation_queue:
+snapdragon_forumapi_admin_moderation_queue:
     path: /api/v1/snapdragon/admin/moderation-queue
     methods: [GET]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:moderation_queue
+        _controller: snapdragon.forumapi.controller.admin:moderation_queue
 
-snapdragon_jsonapi_admin_moderation_approve:
+snapdragon_forumapi_admin_moderation_approve:
     path: /api/v1/snapdragon/admin/moderation/{id}/approve
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:approve
+        _controller: snapdragon.forumapi.controller.admin:approve
     requirements:
         id: \d+
 
-snapdragon_jsonapi_admin_moderation_reject:
+snapdragon_forumapi_admin_moderation_reject:
     path: /api/v1/snapdragon/admin/moderation/{id}/reject
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:reject
+        _controller: snapdragon.forumapi.controller.admin:reject
     requirements:
         id: \d+
 
-snapdragon_jsonapi_admin_ban_user:
+snapdragon_forumapi_admin_ban_user:
     path: /api/v1/snapdragon/admin/users/{sub}/ban
     methods: [POST]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:ban_user
+        _controller: snapdragon.forumapi.controller.admin:ban_user
     requirements:
         sub: '[^/]+'
 
-snapdragon_jsonapi_admin_unban_user:
+snapdragon_forumapi_admin_unban_user:
     path: /api/v1/snapdragon/admin/users/{sub}/ban
     methods: [DELETE]
     defaults:
-        _controller: snapdragon.jsonapi.controller.admin:unban_user
+        _controller: snapdragon.forumapi.controller.admin:unban_user
     requirements:
         sub: '[^/]+'

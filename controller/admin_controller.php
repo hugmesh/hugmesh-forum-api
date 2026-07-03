@@ -1,19 +1,19 @@
 <?php
 /**
- * Snapdragon JSON API — admin endpoints (ROLE_ADMIN required).
+ * Snapdragon Forum API — admin endpoints (ROLE_ADMIN required).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\controller;
+namespace snapdragon\forumapi\controller;
 
-use snapdragon\jsonapi\auth\authenticator;
-use snapdragon\jsonapi\auth\auth_exception;
-use snapdragon\jsonapi\service\admin_service;
-use snapdragon\jsonapi\service\forum_repository;
-use snapdragon\jsonapi\service\posting_service;
-use snapdragon\jsonapi\service\user_mapper;
+use snapdragon\forumapi\auth\authenticator;
+use snapdragon\forumapi\auth\auth_exception;
+use snapdragon\forumapi\service\admin_service;
+use snapdragon\forumapi\service\forum_repository;
+use snapdragon\forumapi\service\posting_service;
+use snapdragon\forumapi\service\user_mapper;
 use Symfony\Component\HttpFoundation\Request;
 
 /**

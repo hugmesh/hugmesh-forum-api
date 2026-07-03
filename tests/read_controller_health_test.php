@@ -5,7 +5,7 @@
  * The deployment's readiness/liveness probes hit /api/v1/snapdragon/health with NO
  * Authorization header. health() must therefore answer 200 WITHOUT authenticating. These
  * tests assert:
- *   - a static 200 {status:"ok", service:"snapdragon-jsonapi"} body;
+ *   - a static 200 {status:"ok", service:"snapdragon-forumapi"} body;
  *   - that authentication is NEVER invoked — the controller is built with a verifier whose
  *     JWKS fetcher throws if called, so any attempt to authenticate would fail the test;
  *   - that no forum_repository / DB access happens (the repo is constructed without a real
@@ -15,14 +15,14 @@
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\tests;
+namespace snapdragon\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\jsonapi\auth\authenticator;
-use snapdragon\jsonapi\auth\jwks_provider;
-use snapdragon\jsonapi\auth\jwt_verifier;
-use snapdragon\jsonapi\controller\read_controller;
-use snapdragon\jsonapi\service\forum_repository;
+use snapdragon\forumapi\auth\authenticator;
+use snapdragon\forumapi\auth\jwks_provider;
+use snapdragon\forumapi\auth\jwt_verifier;
+use snapdragon\forumapi\controller\read_controller;
+use snapdragon\forumapi\service\forum_repository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class read_controller_health_test extends TestCase
@@ -53,7 +53,7 @@ class read_controller_health_test extends TestCase
         $body = json_decode($this->controller()->health()->getContent(), true);
 
         $this->assertSame('ok', $body['status']);
-        $this->assertSame('snapdragon-jsonapi', $body['service']);
+        $this->assertSame('snapdragon-forumapi', $body['service']);
         // Nothing that could leak forum/DB state.
         $this->assertSame(['status', 'service'], array_keys($body));
     }

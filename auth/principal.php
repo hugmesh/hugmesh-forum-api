@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon JSON API — authenticated principal value object.
+ * Snapdragon Forum API — authenticated principal value object.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\auth;
+namespace snapdragon\forumapi\auth;
 
 /**
  * An immutable, validated principal derived from a verified Casdoor JWT.

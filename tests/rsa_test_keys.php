@@ -7,7 +7,7 @@
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\tests;
+namespace snapdragon\forumapi\tests;
 
 use Firebase\JWT\JWT;
 

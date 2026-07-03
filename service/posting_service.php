@@ -1,14 +1,14 @@
 <?php
 /**
- * Snapdragon JSON API — acts-as-user posting via phpBB submit_post() + content_visibility.
+ * Snapdragon Forum API — acts-as-user posting via phpBB submit_post() + content_visibility.
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\service;
+namespace snapdragon\forumapi\service;
 
-use snapdragon\jsonapi\auth\principal;
+use snapdragon\forumapi\auth\principal;
 
 /**
  * Performs the WRITE operations through phpBB's own consistency/permission logic.

@@ -1,17 +1,17 @@
 <?php
 /**
- * Snapdragon JSON API — admin operations (user ensure/list, group sync, category, styles, extensions).
+ * Snapdragon Forum API — admin operations (user ensure/list, group sync, category, styles, extensions).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\service;
+namespace snapdragon\forumapi\service;
 
-use snapdragon\jsonapi\auth\principal;
+use snapdragon\forumapi\auth\principal;
 
 /**
- * Backs {@see \snapdragon\jsonapi\controller\admin_controller}. Bridges path-keyed
+ * Backs {@see \snapdragon\forumapi\controller\admin_controller}. Bridges path-keyed
  * Casdoor subs to phpBB users, converges declarative groups, manages forums (categories),
  * and enables styles/extensions via phpBB's own managers.
  *
@@ -241,7 +241,7 @@ class admin_service
         $phpbb_id = $this->user_mapper->find_user_id((string) $casdoor_sub);
         if ($phpbb_id === null)
         {
-            throw \snapdragon\jsonapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
+            throw \snapdragon\forumapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
         }
 
         $banlist_table    = $this->table_prefix . 'banlist';
@@ -333,7 +333,7 @@ class admin_service
         $phpbb_id = $this->user_mapper->find_user_id((string) $casdoor_sub);
         if ($phpbb_id === null)
         {
-            throw \snapdragon\jsonapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
+            throw \snapdragon\forumapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
         }
 
         $banlist_table    = $this->table_prefix . 'banlist';
@@ -452,7 +452,7 @@ class admin_service
 
         if (!empty($errors))
         {
-            throw new \RuntimeException('Snapdragon JSON API: forum create failed: ' . implode('; ', (array) $errors));
+            throw new \RuntimeException('Snapdragon Forum API: forum create failed: ' . implode('; ', (array) $errors));
         }
 
         $forum_id = (int) $forum_data['forum_id'];
@@ -503,7 +503,7 @@ class admin_service
     {
         if ($this->container === null)
         {
-            throw new \RuntimeException('Snapdragon JSON API: no container for extension manager.');
+            throw new \RuntimeException('Snapdragon Forum API: no container for extension manager.');
         }
         /** @var \phpbb\extension\manager $ext_manager */
         $ext_manager = $this->container->get('ext.manager');

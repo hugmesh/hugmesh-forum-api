@@ -29,22 +29,22 @@ namespace
     {
         function group_user_add($group_id, $user_ids)
         {
-            \snapdragon\jsonapi\tests\group_calls::$adds[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
+            \snapdragon\forumapi\tests\group_calls::$adds[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
         }
     }
     if (!function_exists('group_user_del'))
     {
         function group_user_del($group_id, $user_ids)
         {
-            \snapdragon\jsonapi\tests\group_calls::$dels[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
+            \snapdragon\forumapi\tests\group_calls::$dels[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
         }
     }
 }
 
-namespace snapdragon\jsonapi\tests
+namespace snapdragon\forumapi\tests
 {
     use PHPUnit\Framework\TestCase;
-    use snapdragon\jsonapi\service\user_mapper;
+    use snapdragon\forumapi\service\user_mapper;
 
     /**
      * Static recorder the global group_user_add/del shims forward into.

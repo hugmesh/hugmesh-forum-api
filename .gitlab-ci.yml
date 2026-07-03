@@ -1,4 +1,4 @@
-# Snapdragon JSON API — GitLab CI (this org uses GitLab CI, not GitHub Actions).
+# Snapdragon Forum API — GitLab CI (this org uses GitLab CI, not GitHub Actions).
 #
 # Stages: lint (php -l every file) -> validate (composer) -> test (phpunit) ->
 #         build (bake + push the custom phpBB image).
@@ -54,7 +54,7 @@ phpunit:
 
 # -----------------------------------------------------------------------------
 # build:image — bake the custom phpBB image (official phpBB 3.3.11 + THIS
-# extension at ext/snapdragon/jsonapi, baked by the Dockerfile) and push it to
+# extension at ext/snapdragon/forumapi, baked by the Dockerfile) and push it to
 # the in-cluster GitLab container registry. The forum deployment
 # (snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml) runs this image:
 # its initContainer installs + locks down phpBB, and the image entrypoint enables

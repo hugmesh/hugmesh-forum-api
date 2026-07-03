@@ -1,15 +1,15 @@
 <?php
 /**
- * Snapdragon JSON API — base controller (shared auth + JSON helpers).
+ * Snapdragon Forum API — base controller (shared auth + JSON helpers).
  *
  * @copyright (c) 2026 Snapdragon Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\jsonapi\controller;
+namespace snapdragon\forumapi\controller;
 
-use snapdragon\jsonapi\auth\authenticator;
-use snapdragon\jsonapi\auth\auth_exception;
+use snapdragon\forumapi\auth\authenticator;
+use snapdragon\forumapi\auth\auth_exception;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -50,7 +50,7 @@ abstract class base_controller
     /**
      * Authenticate the current request, returning the verified principal.
      *
-     * @return \snapdragon\jsonapi\auth\principal
+     * @return \snapdragon\forumapi\auth\principal
      *
      * @throws auth_exception 401 on failure.
      */

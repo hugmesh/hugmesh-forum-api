@@ -1,4 +1,4 @@
-# snapdragon/jsonapi — phpBB 3.3 headless JSON API extension
+# snapdragon/forumapi — phpBB 3.3 headless Forum API extension
 
 The **server side** the (already-built) `snapdragon-forum-bff-api` client calls. phpBB
 ships no first-class REST API; this extension registers routes under
@@ -8,11 +8,11 @@ services (`submit_post()`, `content_visibility`, the group functions, `user_add(
 permission/consistency logic is never bypassed and the schema is version-locked to the
 install.
 
-Installs at `ext/snapdragon/jsonapi/` (composer name `snapdragon/jsonapi`, PHP namespace
-`snapdragon\jsonapi`). The composer `name` MUST equal the install directory path and may
+Installs at `ext/snapdragon/forumapi/` (composer name `snapdragon/forumapi`, PHP namespace
+`snapdragon\forumapi`). The composer `name` MUST equal the install directory path and may
 contain no hyphen: phpBB validates the extension name against
 `^[A-Za-z0-9_]{2,}/[A-Za-z0-9_]{2,}$` and requires `name == ext/<dir>` — a hyphenated
-`snapdragon/json-api` is silently un-enableable (`extension:enable` reports "does not
+`snapdragon/forum-api` is silently un-enableable (`extension:enable` reports "does not
 exist").
 
 ---
@@ -150,11 +150,11 @@ secret is committed**. See `.env.example`.
 ### Baked image (deployment)
 
 The `Dockerfile` produces `snapdragon-systems/phpbb:dev`: official phpBB 3.3 on
-`php:8.1-apache`, this extension at `ext/snapdragon/jsonapi/`, `composer install` for
+`php:8.1-apache`, this extension at `ext/snapdragon/forumapi/`, `composer install` for
 `firebase/php-jwt`, and an entrypoint that enables the extension via `phpbbcli` on first
 boot. The deployment
 (`snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`snapdragon-forum`) sets `PHPBB_EXTENSION=snapdragon/jsonapi`, injects
+`snapdragon-forum`) sets `PHPBB_EXTENSION=snapdragon/forumapi`, injects
 `SNAPDRAGON_JWKS_URI` / `SNAPDRAGON_JWT_ISSUER` from a Secret, locks down native
 login/ACP, and points the forum-bff WebClient at
 `http://phpbb.snapdragon-forum.svc.cluster.local:80`.
@@ -163,11 +163,11 @@ login/ACP, and points the forum-bff WebClient at
 
 ```bash
 cd /path/to/phpBB/ext
-mkdir -p snapdragon/jsonapi
-# copy this repo's contents into snapdragon/jsonapi/
-cd snapdragon/jsonapi && composer install --no-dev
+mkdir -p snapdragon/forumapi
+# copy this repo's contents into snapdragon/forumapi/
+cd snapdragon/forumapi && composer install --no-dev
 cd /path/to/phpBB
-php bin/phpbbcli.php extension:enable snapdragon/jsonapi
+php bin/phpbbcli.php extension:enable snapdragon/forumapi
 # set SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER in the web server environment
 ```
 
@@ -219,7 +219,7 @@ Apache lockdown denies every `.php` except `app.php`, and the entrypoint removes
 docker compose up --build
 # First boot: the entrypoint probes the empty Postgres and runs the headless installer
 # with docker/install-config.compose.yml (DEV-ONLY literal creds; DDL-once guarded),
-# enables snapdragon/jsonapi, removes install/, and serves rootless on :8080. Then:
+# enables snapdragon/forumapi, removes install/, and serves rootless on :8080. Then:
 curl -i http://localhost:8080/app.php/api/v1/snapdragon/health          # 200, no JWT
 curl -i http://localhost:8080/app.php/api/v1/snapdragon/stats           # 401 fail-closed
 curl -i http://localhost:8080/index.php                                 # 403 (lockdown)
@@ -238,8 +238,8 @@ runner). (No GitHub Actions — this org uses GitLab CI.)
 **Live-proven** (against real **phpBB 3.3.11**):
 
 - The custom image **builds** (official phpBB 3.3.11 on `php:8.1-apache` + this extension at
-  `ext/snapdragon/jsonapi/` + `firebase/php-jwt`), and the `build:image` CI stage pushes it.
-- The extension **enables** under the de-hyphenated name `snapdragon/jsonapi` (the hyphenated
+  `ext/snapdragon/forumapi/` + `firebase/php-jwt`), and the `build:image` CI stage pushes it.
+- The extension **enables** under the de-hyphenated name `snapdragon/forumapi` (the hyphenated
   package would not enable at all — see the composer-name note above).
 - The schema **migration runs** — the `phpbb_snapdragon_casdoor_map` table is created.
 - The routes **register and match** — the full authed contract round-trip
@@ -258,7 +258,7 @@ extension bug.
 **Generator follow-ups for true on-cluster go-live:**
 
 - `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
-  **`snapdragon/jsonapi`** name (no hyphen) and run the **`snapdragon-systems/phpbb:dev`**
+  **`snapdragon/forumapi`** name (no hyphen) and run the **`snapdragon-systems/phpbb:dev`**
   image this repo builds.
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
   board-disable flag.
