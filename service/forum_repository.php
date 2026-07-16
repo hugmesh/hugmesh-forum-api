@@ -8,6 +8,8 @@
 
 namespace snapdragon\forumapi\service;
 
+use snapdragon\forumapi\text\sticker_tokens;
+
 /**
  * Reads phpBB forums/topics/posts/users via the injected DBAL connection and maps rows
  * to the pinned DTO shapes (Category / Topic / Reply / Stats / QueueItem). Timestamps
@@ -16,6 +18,12 @@ namespace snapdragon\forumapi\service;
  * The Casdoor sub for {@code authorSubject} is resolved by joining the poster's user_id
  * back through {@code phpbb_snapdragon_casdoor_map}; a phpBB user with no mapping (a
  * native account) yields an empty {@code authorSubject}.
+ *
+ * {@code Reply.body} / {@code QueueItem.excerpt} additionally run through
+ * {@see \snapdragon\forumapi\text\sticker_tokens::render()}, which renders any
+ * `:snap-sticker:<slug>:` token to the same `<img>` markup forum-ui's client-side transform
+ * produces — so a raw API consumer (not just forum-ui) sees a rendered sticker rather than
+ * the literal token.
  */
 class forum_repository
 {
@@ -293,6 +301,9 @@ class forum_repository
             {
                 $excerpt = substr($excerpt, 0, 200);
             }
+            // Render AFTER truncation: a token cut in half by the 200-char cap simply fails
+            // to match (no dangling/broken <img> markup from a truncated attribute).
+            $excerpt = sticker_tokens::render($excerpt);
 
             $out[] = [
                 'id'            => (string) $row['post_id'],
@@ -337,7 +348,7 @@ class forum_repository
             'id'            => (int) $row['post_id'],
             'topicId'       => (int) $row['topic_id'],
             'authorSubject' => $this->subject_for_user((int) $row['poster_id']),
-            'body'          => $this->strip_text((string) $row['post_text']),
+            'body'          => sticker_tokens::render($this->strip_text((string) $row['post_text'])),
             'createdAt'     => $this->iso8601((int) $row['post_time']),
         ];
     }

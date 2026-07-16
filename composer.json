@@ -21,7 +21,9 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^9.6",
-        "symfony/http-foundation": ">=3.4"
+        "symfony/http-foundation": ">=3.4",
+        "symfony/event-dispatcher": "~3.4",
+        "s9e/text-formatter": "^2.0"
     },
     "extra": {
         "display-name": "Snapdragon Forum API",

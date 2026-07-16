@@ -1,9 +1,9 @@
 # Snapdragon Forum API — service container definitions.
 #
 # Wires the auth chain (JWKS provider -> JWT verifier -> authenticator), the
-# config provider, the data services, and the three controllers, injecting phpBB
-# core services (@dbal.conn, @user, @auth, @config, @content.visibility) and the
-# %core.*% parameters.
+# config provider, the data services, the three controllers, and the s9e
+# text-formatter event listener, injecting phpBB core services (@dbal.conn, @user,
+# @auth, @config, @content.visibility) and the %core.*% parameters.
 
 services:
 
@@ -97,3 +97,11 @@ services:
             - '@snapdragon.forumapi.service.admin_service'
             - '@snapdragon.forumapi.service.posting_service'
             - '@symfony_request'
+
+    # ── event listeners ─────────────────────────────────────────────
+    # Registers `:snap-sticker:<slug>:` as a real s9e\TextFormatter tag (see the class doc
+    # for exactly which phpBB event this hooks and why).
+    snapdragon.forumapi.event.main_listener:
+        class: snapdragon\forumapi\event\main_listener
+        tags:
+            - { name: event.listener }
