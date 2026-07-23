@@ -142,6 +142,12 @@ secret is committed**. See `.env.example`.
   groups (`group_user_add` / `group_user_del`). Non-managed memberships are untouched.
 - **Reads** query phpBB tables via the injected DBAL connection and map to the DTOs;
   stats are `COUNT` queries (`source = "live"`).
+- **Sticker tokens**: `:snap-sticker:<slug>:` in stored post text is rendered server-side
+  (`text/sticker_tokens.php`) into a same-origin `<img class="forum-sticker">` tag before
+  `Reply.body` / `QueueItem.excerpt` are returned — so those two JSON fields can contain
+  embedded HTML, not just plain text. `event/main_listener.php` also hooks phpBB's own
+  s9e text-formatter (`core.text_formatter_s9e_configure_after`) so the same token
+  grammar renders identically if phpBB's own pipeline ever displays these posts.
 
 ---
 
@@ -149,14 +155,22 @@ secret is committed**. See `.env.example`.
 
 ### Baked image (deployment)
 
-The `Dockerfile` produces `hugmesh-systems/phpbb:dev`: official phpBB 3.3 on
-`php:8.1-apache`, this extension at `ext/hugmesh/forumapi/`, `composer install` for
-`firebase/php-jwt`, and an entrypoint that enables the extension via `phpbbcli` on first
-boot. The deployment
+The `Dockerfile` produces the image the deployment logically references as
+`hugmesh-systems/phpbb:dev`: official phpBB 3.3 on `php:8.1-apache`, this extension at
+`ext/hugmesh/forumapi/`, `composer install` for `firebase/php-jwt`, and an entrypoint
+that enables the extension via `phpbbcli` on first boot.
+
+**Cross-repo drift (as of this writing):** the cluster manifests
 (`hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`snapdragon-forum`) sets `PHPBB_EXTENSION=hugmesh/forumapi`, injects
-`HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` from a Secret, locks down native
-login/ACP, and points the forum-bff WebClient at
+`snapdragon-forum`) have not picked up this repo's `hugmesh/forumapi` rename yet — they
+still set `PHPBB_EXTENSION=snapdragon/forumapi`, build/reference the image tag
+`snapdragon-systems/phpbb:dev`, and inject the pre-rename `SNAPDRAGON_JWKS_URI` /
+`SNAPDRAGON_JWT_ISSUER` env vars, none of which this extension reads anymore — it reads
+`HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` (see Auth above). Deployed as currently
+written, the extension fails closed (missing issuer → every request gets `401`), not
+open, but it also never enables/loads as `snapdragon/forumapi` no longer exists in this
+repo. See **Generator follow-ups** below for the full punch list. The manifests do
+correctly point the forum-bff WebClient at
 `http://phpbb.snapdragon-forum.svc.cluster.local:80`.
 
 ### Manual (existing phpBB 3.3)
@@ -260,6 +274,10 @@ extension bug.
 - `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
   **`hugmesh/forumapi`** name (no hyphen) and run the **`hugmesh-systems/phpbb:dev`**
   image this repo builds.
+- The same manifest must rename the injected env vars from `SNAPDRAGON_JWKS_URI` /
+  `SNAPDRAGON_JWT_ISSUER` to **`HUGMESH_JWKS_URI`** / **`HUGMESH_JWT_ISSUER`** — this
+  extension stopped reading the old names in the HugMesh rebrand (see Auth above), so as
+  currently written the manifest injects config this extension never sees.
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
   board-disable flag.
 - The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) is **resolved**: Apache now
