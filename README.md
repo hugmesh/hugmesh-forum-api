@@ -257,8 +257,12 @@ runner). (No GitHub Actions — this org uses GitLab CI.)
 - The schema **migration runs** — the `phpbb_hugmesh_casdoor_map` table is created.
 - The routes **register and match** — the full authed contract round-trip
   (acts-as-user authorship, moderation visibility, group sync, ownership/role gates) plus
-  every auth negative passed a MySQL docker-compose smoke (30/30) against a real install,
-  and the unauthenticated `/health` probe returns `200`.
+  every auth negative passed a docker-compose smoke (30/30) against a real install. That
+  full round-trip was proven on the **pre-migration MySQL-based harness**; since the local
+  harness moved to the cluster-shaped Postgres setup (PR #12), only the shallow checks have
+  been re-confirmed there (`/health` 200, `/stats` 401 fail-closed, board-lockdown 403,
+  restart-idempotent schema detection) — the deep round-trip has not yet been re-run
+  against Postgres, which is part of the gap called out below.
 
 **NOT yet live-proven:** end-to-end authed HTTP posting **through the route on a
 cluster-shaped (pgsql, init→main split) harness**. The bootstrap/lockdown concerns were
