@@ -1,15 +1,15 @@
 <?php
 /**
- * Snapdragon Forum API — base controller (shared auth + JSON helpers).
+ * HugMesh Forum API — base controller (shared auth + JSON helpers).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\controller;
+namespace hugmesh\forumapi\controller;
 
-use snapdragon\forumapi\auth\authenticator;
-use snapdragon\forumapi\auth\auth_exception;
+use hugmesh\forumapi\auth\authenticator;
+use hugmesh\forumapi\auth\auth_exception;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -50,7 +50,7 @@ abstract class base_controller
     /**
      * Authenticate the current request, returning the verified principal.
      *
-     * @return \snapdragon\forumapi\auth\principal
+     * @return \hugmesh\forumapi\auth\principal
      *
      * @throws auth_exception 401 on failure.
      */

@@ -1,15 +1,15 @@
 <?php
 /**
- * Snapdragon Forum API — phpBB 3.3 headless Forum API extension.
+ * HugMesh Forum API — phpBB 3.3 headless Forum API extension.
  *
- * Installs at ext/snapdragon/forumapi/ (composer name snapdragon/forumapi — MUST equal the
+ * Installs at ext/hugmesh/forumapi/ (composer name hugmesh/forumapi — MUST equal the
  * directory path and contain no hyphen, or phpBB cannot enable it).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi;
+namespace hugmesh\forumapi;
 
 /**
  * The extension metadata / lifecycle class.

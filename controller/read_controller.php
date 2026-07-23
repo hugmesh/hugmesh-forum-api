@@ -1,16 +1,16 @@
 <?php
 /**
- * Snapdragon Forum API — read endpoints (any authenticated user).
+ * HugMesh Forum API — read endpoints (any authenticated user).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\controller;
+namespace hugmesh\forumapi\controller;
 
-use snapdragon\forumapi\auth\authenticator;
-use snapdragon\forumapi\auth\auth_exception;
-use snapdragon\forumapi\service\forum_repository;
+use hugmesh\forumapi\auth\authenticator;
+use hugmesh\forumapi\auth\auth_exception;
+use hugmesh\forumapi\service\forum_repository;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -44,7 +44,7 @@ class read_controller extends base_controller
     /**
      * GET /health -> 200 {status:"ok"}. UNAUTHENTICATED liveness/readiness probe.
      *
-     * The deployment's readiness/liveness probes hit /api/v1/snapdragon/health, which a
+     * The deployment's readiness/liveness probes hit /api/v1/hugmesh/health, which a
      * kube probe issues with no Authorization header — so this route must NOT authenticate.
      * It proves the PHP/extension/routing stack is alive (a board page would not, since the
      * board is locked down); the DB has its own readiness. The body is a static literal: no
@@ -55,7 +55,7 @@ class read_controller extends base_controller
     public function health()
     {
         return $this->guard(function () {
-            return $this->json(['status' => 'ok', 'service' => 'snapdragon-forumapi']);
+            return $this->json(['status' => 'ok', 'service' => 'hugmesh-forumapi']);
         });
     }
 

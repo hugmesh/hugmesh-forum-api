@@ -1,18 +1,18 @@
-# snapdragon/forumapi — phpBB 3.3 headless Forum API extension
+# hugmesh/forumapi — phpBB 3.3 headless Forum API extension
 
-The **server side** the (already-built) `snapdragon-forum-bff-api` client calls. phpBB
+The **server side** the (already-built) `hugmesh-forum-bff-api` client calls. phpBB
 ships no first-class REST API; this extension registers routes under
-`/api/v1/snapdragon/**` on phpBB's Symfony HttpKernel, validates the Casdoor JWT,
+`/api/v1/hugmesh/**` on phpBB's Symfony HttpKernel, validates the Casdoor JWT,
 re-derives authority **server-side**, and performs reads/writes through phpBB's **own**
 services (`submit_post()`, `content_visibility`, the group functions, `user_add()`) so
 permission/consistency logic is never bypassed and the schema is version-locked to the
 install.
 
-Installs at `ext/snapdragon/forumapi/` (composer name `snapdragon/forumapi`, PHP namespace
-`snapdragon\forumapi`). The composer `name` MUST equal the install directory path and may
+Installs at `ext/hugmesh/forumapi/` (composer name `hugmesh/forumapi`, PHP namespace
+`hugmesh\forumapi`). The composer `name` MUST equal the install directory path and may
 contain no hyphen: phpBB validates the extension name against
 `^[A-Za-z0-9_]{2,}/[A-Za-z0-9_]{2,}$` and requires `name == ext/<dir>` — a hyphenated
-`snapdragon/forum-api` is silently un-enableable (`extension:enable` reports "does not
+`hugmesh/forum-api` is silently un-enableable (`extension:enable` reports "does not
 exist").
 
 ---
@@ -30,8 +30,8 @@ permission/ban checks). This matches the rationale documented in the forum-bff
 
 ## The contract
 
-Base path: **`/api/v1/snapdragon`**. Every request carries the Casdoor JWT as **both**
-`Authorization: Bearer <jwt>` **and** `X-Snapdragon-JWT: <jwt>`. JSON field names/types
+Base path: **`/api/v1/hugmesh`**. Every request carries the Casdoor JWT as **both**
+`Authorization: Bearer <jwt>` **and** `X-HugMesh-JWT: <jwt>`. JSON field names/types
 match the forum-bff Jackson records exactly; timestamps are ISO-8601 strings.
 
 ### Endpoints
@@ -88,18 +88,18 @@ CreateCategory  { name:string, description:string, parentId:long? }
 
 ## Auth (security-critical)
 
-1. The JWT is extracted from `Authorization: Bearer` and/or `X-Snapdragon-JWT`. When
+1. The JWT is extracted from `Authorization: Bearer` and/or `X-HugMesh-JWT`. When
    both are present they must be the **same** token (no header-confusion downgrade).
 2. **RS256 signature** is verified against the Casdoor JWKS — fetched (and cached) from
-   the issuer's `jwks_uri` (`SNAPDRAGON_JWKS_URI`), using `firebase/php-jwt`. On a `kid`
+   the issuer's `jwks_uri` (`HUGMESH_JWKS_URI`), using `firebase/php-jwt`. On a `kid`
    miss the key set is refreshed once (rotation) before failing closed.
 3. `exp` / `nbf` are enforced by `firebase/php-jwt`. `iss` is verified here against
-   `SNAPDRAGON_JWT_ISSUER`, which is **required** — if it is unset, every token is
+   `HUGMESH_JWT_ISSUER`, which is **required** — if it is unset, every token is
    rejected with `401` (fail-closed; we never fall open and skip the issuer check). `aud`
-   is **optional** and verified here **iff** `SNAPDRAGON_JWT_AUDIENCE` is set
+   is **optional** and verified here **iff** `HUGMESH_JWT_AUDIENCE` is set
    (`firebase/php-jwt` does not verify `iss`/`aud` itself).
 4. **Authority is re-derived server-side** from the token claims — mirroring the
-   snapdragon `CasdoorAuthorities` convention exactly:
+   hugmesh `CasdoorAuthorities` convention exactly:
    - `roles[]` (strings or `{name}` objects) → `ROLE_<UPPER>`;
    - `permissions[]` verbatim, **except** entries starting with a reserved prefix
      (`ROLE_` / `DOMAIN_`) are **dropped** (authority-injection defense);
@@ -125,7 +125,7 @@ secret is committed**. See `.env.example`.
 
 ## phpBB mechanics
 
-- **Casdoor sub → phpBB user_id** via the side table `phpbb_snapdragon_casdoor_map`
+- **Casdoor sub → phpBB user_id** via the side table `phpbb_hugmesh_casdoor_map`
   (migration `migrations/m1_initial_schema.php`). `POST /users/{sub}/ensure` (and a lazy
   resolve before any acts-as-user write) calls `user_add()` keyed by the sub and inserts
   the mapping row.
@@ -149,13 +149,13 @@ secret is committed**. See `.env.example`.
 
 ### Baked image (deployment)
 
-The `Dockerfile` produces `snapdragon-systems/phpbb:dev`: official phpBB 3.3 on
-`php:8.1-apache`, this extension at `ext/snapdragon/forumapi/`, `composer install` for
+The `Dockerfile` produces `hugmesh-systems/phpbb:dev`: official phpBB 3.3 on
+`php:8.1-apache`, this extension at `ext/hugmesh/forumapi/`, `composer install` for
 `firebase/php-jwt`, and an entrypoint that enables the extension via `phpbbcli` on first
 boot. The deployment
-(`snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`snapdragon-forum`) sets `PHPBB_EXTENSION=snapdragon/forumapi`, injects
-`SNAPDRAGON_JWKS_URI` / `SNAPDRAGON_JWT_ISSUER` from a Secret, locks down native
+(`hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
+`snapdragon-forum`) sets `PHPBB_EXTENSION=hugmesh/forumapi`, injects
+`HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` from a Secret, locks down native
 login/ACP, and points the forum-bff WebClient at
 `http://phpbb.snapdragon-forum.svc.cluster.local:80`.
 
@@ -163,12 +163,12 @@ login/ACP, and points the forum-bff WebClient at
 
 ```bash
 cd /path/to/phpBB/ext
-mkdir -p snapdragon/forumapi
-# copy this repo's contents into snapdragon/forumapi/
-cd snapdragon/forumapi && composer install --no-dev
+mkdir -p hugmesh/forumapi
+# copy this repo's contents into hugmesh/forumapi/
+cd hugmesh/forumapi && composer install --no-dev
 cd /path/to/phpBB
-php bin/phpbbcli.php extension:enable snapdragon/forumapi
-# set SNAPDRAGON_JWKS_URI / SNAPDRAGON_JWT_ISSUER in the web server environment
+php bin/phpbbcli.php extension:enable hugmesh/forumapi
+# set HUGMESH_JWKS_URI / HUGMESH_JWT_ISSUER in the web server environment
 ```
 
 ---
@@ -187,7 +187,7 @@ PHPBB_ENABLED: "true"
 PHPBB_API_BASE_URL: "http://phpbb.snapdragon-forum.svc.cluster.local:80"
 ```
 
-The client then forwards the user's Casdoor JWT (Bearer + `X-Snapdragon-JWT`) on every
+The client then forwards the user's Casdoor JWT (Bearer + `X-HugMesh-JWT`) on every
 call; this extension validates it and re-derives authority. On success it returns real
 bodies (and real 4xx/5xx on failure).
 
@@ -219,11 +219,11 @@ Apache lockdown denies every `.php` except `app.php`, and the entrypoint removes
 docker compose up --build
 # First boot: the entrypoint probes the empty Postgres and runs the headless installer
 # with docker/install-config.compose.yml (DEV-ONLY literal creds; DDL-once guarded),
-# enables snapdragon/forumapi, removes install/, and serves rootless on :8080. Then:
-curl -i http://localhost:8080/app.php/api/v1/snapdragon/health          # 200, no JWT
-curl -i http://localhost:8080/app.php/api/v1/snapdragon/stats           # 401 fail-closed
+# enables hugmesh/forumapi, removes install/, and serves rootless on :8080. Then:
+curl -i http://localhost:8080/app.php/api/v1/hugmesh/health          # 200, no JWT
+curl -i http://localhost:8080/app.php/api/v1/hugmesh/stats           # 401 fail-closed
 curl -i http://localhost:8080/index.php                                 # 403 (lockdown)
-# ...and /app.php/api/v1/snapdragon/** with a Casdoor JWT for the authed contract.
+# ...and /app.php/api/v1/hugmesh/** with a Casdoor JWT for the authed contract.
 # Restarting the phpbb service must log "schema already present … NOT re-installing".
 ```
 
@@ -238,10 +238,10 @@ runner). (No GitHub Actions — this org uses GitLab CI.)
 **Live-proven** (against real **phpBB 3.3.11**):
 
 - The custom image **builds** (official phpBB 3.3.11 on `php:8.1-apache` + this extension at
-  `ext/snapdragon/forumapi/` + `firebase/php-jwt`), and the `build:image` CI stage pushes it.
-- The extension **enables** under the de-hyphenated name `snapdragon/forumapi` (the hyphenated
+  `ext/hugmesh/forumapi/` + `firebase/php-jwt`), and the `build:image` CI stage pushes it.
+- The extension **enables** under the de-hyphenated name `hugmesh/forumapi` (the hyphenated
   package would not enable at all — see the composer-name note above).
-- The schema **migration runs** — the `phpbb_snapdragon_casdoor_map` table is created.
+- The schema **migration runs** — the `phpbb_hugmesh_casdoor_map` table is created.
 - The routes **register and match** — the full authed contract round-trip
   (acts-as-user authorship, moderation visibility, group sync, ownership/role gates) plus
   every auth negative passed a MySQL docker-compose smoke (30/30) against a real install,
@@ -258,7 +258,7 @@ extension bug.
 **Generator follow-ups for true on-cluster go-live:**
 
 - `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
-  **`snapdragon/forumapi`** name (no hyphen) and run the **`snapdragon-systems/phpbb:dev`**
+  **`hugmesh/forumapi`** name (no hyphen) and run the **`hugmesh-systems/phpbb:dev`**
   image this repo builds.
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
   board-disable flag.
@@ -268,7 +268,7 @@ extension bug.
   Service maps port 80 → targetPort 8080.
 
 This extension is the previously-"unbuilt external contract" the forum-bff
-(`snapdragon-forum-bff-api`) `PhpbbApiClient` was written against — now built. Flipping
+(`hugmesh-forum-bff-api`) `PhpbbApiClient` was written against — now built. Flipping
 `phpbb.enabled=true` on the forum-bff is config-only once the image is on-cluster (see above).
 
 ---

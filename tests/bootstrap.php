@@ -7,7 +7,7 @@
  * locally-signed RS256 tokens. Only composer's autoloader (firebase/php-jwt + the
  * extension's PSR-4 map) is needed.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 

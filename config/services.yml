@@ -1,4 +1,4 @@
-# Snapdragon Forum API — service container definitions.
+# HugMesh Forum API — service container definitions.
 #
 # Wires the auth chain (JWKS provider -> JWT verifier -> authenticator), the
 # config provider, the data services, the three controllers, and the s9e
@@ -8,33 +8,33 @@
 services:
 
     # ── configuration ────────────────────────────────────────────────
-    snapdragon.forumapi.config_provider:
-        class: snapdragon\forumapi\config_provider
+    hugmesh.forumapi.config_provider:
+        class: hugmesh\forumapi\config_provider
         arguments:
             - '@config'
 
     # ── auth chain ───────────────────────────────────────────────────
     # The factory reads the env/config-resolved JWKS URI / issuer / audience at
     # request time (no ExpressionLanguage dependency in the container).
-    snapdragon.forumapi.auth.factory:
-        class: snapdragon\forumapi\auth\auth_factory
+    hugmesh.forumapi.auth.factory:
+        class: hugmesh\forumapi\auth\auth_factory
         arguments:
-            - '@snapdragon.forumapi.config_provider'
+            - '@hugmesh.forumapi.config_provider'
             - '@cache.driver'
 
-    snapdragon.forumapi.auth.authenticator:
-        class: snapdragon\forumapi\auth\authenticator
-        factory: ['@snapdragon.forumapi.auth.factory', 'authenticator']
+    hugmesh.forumapi.auth.authenticator:
+        class: hugmesh\forumapi\auth\authenticator
+        factory: ['@hugmesh.forumapi.auth.factory', 'authenticator']
 
     # ── data services ────────────────────────────────────────────────
-    snapdragon.forumapi.service.forum_repository:
-        class: snapdragon\forumapi\service\forum_repository
+    hugmesh.forumapi.service.forum_repository:
+        class: hugmesh\forumapi\service\forum_repository
         arguments:
             - '@dbal.conn'
             - '%core.table_prefix%'
 
-    snapdragon.forumapi.service.user_mapper:
-        class: snapdragon\forumapi\service\user_mapper
+    hugmesh.forumapi.service.user_mapper:
+        class: hugmesh\forumapi\service\user_mapper
         arguments:
             - '@dbal.conn'
             - '@config'
@@ -42,8 +42,8 @@ services:
             - '%core.root_path%'
             - '%core.php_ext%'
 
-    snapdragon.forumapi.service.posting_service:
-        class: snapdragon\forumapi\service\posting_service
+    hugmesh.forumapi.service.posting_service:
+        class: hugmesh\forumapi\service\posting_service
         arguments:
             - '@dbal.conn'
             - '@user'
@@ -54,12 +54,12 @@ services:
             - '%core.root_path%'
             - '%core.php_ext%'
 
-    snapdragon.forumapi.service.admin_service:
-        class: snapdragon\forumapi\service\admin_service
+    hugmesh.forumapi.service.admin_service:
+        class: hugmesh\forumapi\service\admin_service
         arguments:
             - '@dbal.conn'
-            - '@snapdragon.forumapi.service.user_mapper'
-            - '@snapdragon.forumapi.service.forum_repository'
+            - '@hugmesh.forumapi.service.user_mapper'
+            - '@hugmesh.forumapi.service.forum_repository'
             - '@config'
             - '@service_container'
             - '%core.table_prefix%'
@@ -71,37 +71,37 @@ services:
     # retains the real GET/POST/SERVER/headers). It MUST be injected instead of calling
     # Request::createFromGlobals(), because phpBB deactivates the PHP superglobals and
     # createFromGlobals() then throws a TypeError on every request.
-    snapdragon.forumapi.controller.read:
-        class: snapdragon\forumapi\controller\read_controller
+    hugmesh.forumapi.controller.read:
+        class: hugmesh\forumapi\controller\read_controller
         arguments:
-            - '@snapdragon.forumapi.auth.authenticator'
-            - '@snapdragon.forumapi.service.forum_repository'
+            - '@hugmesh.forumapi.auth.authenticator'
+            - '@hugmesh.forumapi.service.forum_repository'
             - '@symfony_request'
 
-    snapdragon.forumapi.controller.write:
-        class: snapdragon\forumapi\controller\write_controller
+    hugmesh.forumapi.controller.write:
+        class: hugmesh\forumapi\controller\write_controller
         arguments:
-            - '@snapdragon.forumapi.auth.authenticator'
-            - '@snapdragon.forumapi.service.forum_repository'
-            - '@snapdragon.forumapi.service.posting_service'
-            - '@snapdragon.forumapi.service.user_mapper'
-            - '@snapdragon.forumapi.config_provider'
+            - '@hugmesh.forumapi.auth.authenticator'
+            - '@hugmesh.forumapi.service.forum_repository'
+            - '@hugmesh.forumapi.service.posting_service'
+            - '@hugmesh.forumapi.service.user_mapper'
+            - '@hugmesh.forumapi.config_provider'
             - '@symfony_request'
 
-    snapdragon.forumapi.controller.admin:
-        class: snapdragon\forumapi\controller\admin_controller
+    hugmesh.forumapi.controller.admin:
+        class: hugmesh\forumapi\controller\admin_controller
         arguments:
-            - '@snapdragon.forumapi.auth.authenticator'
-            - '@snapdragon.forumapi.service.user_mapper'
-            - '@snapdragon.forumapi.service.forum_repository'
-            - '@snapdragon.forumapi.service.admin_service'
-            - '@snapdragon.forumapi.service.posting_service'
+            - '@hugmesh.forumapi.auth.authenticator'
+            - '@hugmesh.forumapi.service.user_mapper'
+            - '@hugmesh.forumapi.service.forum_repository'
+            - '@hugmesh.forumapi.service.admin_service'
+            - '@hugmesh.forumapi.service.posting_service'
             - '@symfony_request'
 
     # ── event listeners ─────────────────────────────────────────────
     # Registers `:snap-sticker:<slug>:` as a real s9e\TextFormatter tag (see the class doc
     # for exactly which phpBB event this hooks and why).
-    snapdragon.forumapi.event.main_listener:
-        class: snapdragon\forumapi\event\main_listener
+    hugmesh.forumapi.event.main_listener:
+        class: hugmesh\forumapi\event\main_listener
         tags:
             - { name: event.listener }

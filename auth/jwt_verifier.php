@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon Forum API — Casdoor JWT verifier + server-side authority re-derivation.
+ * HugMesh Forum API — Casdoor JWT verifier + server-side authority re-derivation.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\auth;
+namespace hugmesh\forumapi\auth;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\ExpiredException;
@@ -19,7 +19,7 @@ use Firebase\JWT\BeforeValidException;
  *
  * <h3>Validation steps (fail-closed)</h3>
  * <ol>
- *   <li>Extract the token from {@code Authorization: Bearer} and/or {@code X-Snapdragon-JWT};
+ *   <li>Extract the token from {@code Authorization: Bearer} and/or {@code X-HugMesh-JWT};
  *       both must, when present, carry the SAME token (no header confusion).</li>
  *   <li>RS256 signature verification against the cached Casdoor JWKS
  *       ({@see jwks_provider}); on a {@code kid} miss the key set is refreshed once
@@ -29,7 +29,7 @@ use Firebase\JWT\BeforeValidException;
  *   <li>{@code aud} is verified here IFF an audience is configured (optional).</li>
  * </ol>
  *
- * <h3>Authority re-derivation (mirrors snapdragon CasdoorAuthorities EXACTLY)</h3>
+ * <h3>Authority re-derivation (mirrors hugmesh CasdoorAuthorities EXACTLY)</h3>
  * Three claim sources, in precedence, with a floor of {@code ROLE_USER}:
  * <ol>
  *   <li>{@code roles} array (strings OR objects with a {@code name} field) ->
@@ -70,9 +70,9 @@ class jwt_verifier
 
     /**
      * @param jwks_provider $jwks              The JWKS key provider.
-     * @param string        $expected_issuer   The configured Casdoor issuer (SNAPDRAGON_JWT_ISSUER).
+     * @param string        $expected_issuer   The configured Casdoor issuer (HUGMESH_JWT_ISSUER).
      *                                          MANDATORY: if empty, every verify() fails 401.
-     * @param string        $expected_audience Optional configured audience (SNAPDRAGON_JWT_AUDIENCE);
+     * @param string        $expected_audience Optional configured audience (HUGMESH_JWT_AUDIENCE);
      *                                          validated only when set, ignored when empty.
      * @param int           $leeway            Clock-skew leeway in seconds for exp/nbf/iat.
      */
@@ -196,7 +196,7 @@ class jwt_verifier
     /**
      * Re-derive the authority list from the token claims. Floor = ROLE_USER.
      *
-     * MIRRORS snapdragon CasdoorAuthorities: roles -> ROLE_<UPPER>; permissions verbatim
+     * MIRRORS hugmesh CasdoorAuthorities: roles -> ROLE_<UPPER>; permissions verbatim
      * minus RESERVED-prefixed entries; isAdmin -> ROLE_ADMIN. NEVER reads a request body.
      *
      * @param array $claims

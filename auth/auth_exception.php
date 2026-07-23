@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon Forum API — auth/authorization exception carrying an HTTP status.
+ * HugMesh Forum API — auth/authorization exception carrying an HTTP status.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\auth;
+namespace hugmesh\forumapi\auth;
 
 /**
  * A fail-closed authentication/authorization error. Carries the HTTP status code the

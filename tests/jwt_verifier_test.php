@@ -8,18 +8,18 @@
  * dropped, and that a body-supplied authorSubject is IGNORED (the principal subject
  * always comes from the token sub).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\tests;
+namespace hugmesh\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\forumapi\auth\auth_exception;
-use snapdragon\forumapi\auth\authenticator;
-use snapdragon\forumapi\auth\jwks_provider;
-use snapdragon\forumapi\auth\jwt_verifier;
-use snapdragon\forumapi\auth\principal;
+use hugmesh\forumapi\auth\auth_exception;
+use hugmesh\forumapi\auth\authenticator;
+use hugmesh\forumapi\auth\jwks_provider;
+use hugmesh\forumapi\auth\jwt_verifier;
+use hugmesh\forumapi\auth\principal;
 use Symfony\Component\HttpFoundation\Request;
 
 class jwt_verifier_test extends TestCase
@@ -250,20 +250,20 @@ class jwt_verifier_test extends TestCase
         $token = $this->keys->sign($this->base_claims());
         $auth = new authenticator($this->verifier());
 
-        $request = Request::create('/api/v1/snapdragon/categories', 'GET');
+        $request = Request::create('/api/v1/hugmesh/categories', 'GET');
         $request->headers->set('Authorization', 'Bearer ' . $token);
 
         $p = $auth->authenticate($request);
         $this->assertSame('casdoor-sub-123', $p->get_subject());
     }
 
-    public function test_authenticator_accepts_x_snapdragon_jwt_header(): void
+    public function test_authenticator_accepts_x_hugmesh_jwt_header(): void
     {
         $token = $this->keys->sign($this->base_claims());
         $auth = new authenticator($this->verifier());
 
-        $request = Request::create('/api/v1/snapdragon/categories', 'GET');
-        $request->headers->set('X-Snapdragon-JWT', $token);
+        $request = Request::create('/api/v1/hugmesh/categories', 'GET');
+        $request->headers->set('X-HugMesh-JWT', $token);
 
         $p = $auth->authenticate($request);
         $this->assertSame('casdoor-sub-123', $p->get_subject());
@@ -275,9 +275,9 @@ class jwt_verifier_test extends TestCase
         $token_b = $this->keys->sign($this->base_claims(['sub' => 'b']));
         $auth = new authenticator($this->verifier());
 
-        $request = Request::create('/api/v1/snapdragon/categories', 'GET');
+        $request = Request::create('/api/v1/hugmesh/categories', 'GET');
         $request->headers->set('Authorization', 'Bearer ' . $token_a);
-        $request->headers->set('X-Snapdragon-JWT', $token_b);
+        $request->headers->set('X-HugMesh-JWT', $token_b);
 
         $this->expectException(auth_exception::class);
         $auth->authenticate($request);
@@ -286,7 +286,7 @@ class jwt_verifier_test extends TestCase
     public function test_authenticator_rejects_missing_token(): void
     {
         $auth = new authenticator($this->verifier());
-        $request = Request::create('/api/v1/snapdragon/categories', 'GET');
+        $request = Request::create('/api/v1/hugmesh/categories', 'GET');
 
         $this->expectException(auth_exception::class);
         try

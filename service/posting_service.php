@@ -1,14 +1,14 @@
 <?php
 /**
- * Snapdragon Forum API — acts-as-user posting via phpBB submit_post() + content_visibility.
+ * HugMesh Forum API — acts-as-user posting via phpBB submit_post() + content_visibility.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\service;
+namespace hugmesh\forumapi\service;
 
-use snapdragon\forumapi\auth\principal;
+use hugmesh\forumapi\auth\principal;
 
 /**
  * Performs the WRITE operations through phpBB's own consistency/permission logic.

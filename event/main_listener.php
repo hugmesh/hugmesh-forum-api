@@ -1,14 +1,14 @@
 <?php
 /**
- * Snapdragon Forum API — phpBB s9e\TextFormatter hook: server-side sticker-token rendering.
+ * HugMesh Forum API — phpBB s9e\TextFormatter hook: server-side sticker-token rendering.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\event;
+namespace hugmesh\forumapi\event;
 
-use snapdragon\forumapi\text\sticker_tokens;
+use hugmesh\forumapi\text\sticker_tokens;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**

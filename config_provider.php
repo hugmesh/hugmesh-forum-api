@@ -1,26 +1,26 @@
 <?php
 /**
- * Snapdragon Forum API — runtime configuration provider (env-first, never committed).
+ * HugMesh Forum API — runtime configuration provider (env-first, never committed).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi;
+namespace hugmesh\forumapi;
 
 /**
  * Resolves the extension's deployment configuration from environment variables, with an
  * optional fallback to the phpBB config table. NO secret value is ever committed — the
- * deployment (snapdragon-generator forum/phpbb.yaml) injects these as env vars / a
+ * deployment (hugmesh-generator forum/phpbb.yaml) injects these as env vars / a
  * Secret. The JWKS URI / issuer are NON-secret references, but kept out of the repo so
  * the same image serves every brand/domain.
  *
  * Recognised keys:
- *  - SNAPDRAGON_JWKS_URI       (required) the Casdoor jwks_uri to fetch signing keys.
- *  - SNAPDRAGON_JWT_ISSUER     (required) the expected iss claim.
- *  - SNAPDRAGON_JWT_AUDIENCE   (optional) the expected aud claim (validated if set).
- *  - SNAPDRAGON_JWT_LEEWAY     (optional) clock-skew leeway seconds (default 30).
- *  - SNAPDRAGON_DEFAULT_FORUM_ID (optional) the fallback phpBB forum_id for new topics
+ *  - HUGMESH_JWKS_URI       (required) the Casdoor jwks_uri to fetch signing keys.
+ *  - HUGMESH_JWT_ISSUER     (required) the expected iss claim.
+ *  - HUGMESH_JWT_AUDIENCE   (optional) the expected aud claim (validated if set).
+ *  - HUGMESH_JWT_LEEWAY     (optional) clock-skew leeway seconds (default 30).
+ *  - HUGMESH_DEFAULT_FORUM_ID (optional) the fallback phpBB forum_id for new topics
  *                              when CreateTopic.categoryId is 0/absent (default 2).
  */
 class config_provider
@@ -49,10 +49,10 @@ class config_provider
      */
     public function jwks_uri()
     {
-        $uri = $this->resolve('SNAPDRAGON_JWKS_URI', 'snapdragon_forumapi_jwks_uri', '');
+        $uri = $this->resolve('HUGMESH_JWKS_URI', 'hugmesh_forumapi_jwks_uri', '');
         if ($uri !== '' && stripos($uri, 'https://') !== 0)
         {
-            throw new \RuntimeException('Snapdragon Forum API: SNAPDRAGON_JWKS_URI must be an absolute https:// URL.');
+            throw new \RuntimeException('HugMesh Forum API: HUGMESH_JWKS_URI must be an absolute https:// URL.');
         }
         return $uri;
     }
@@ -62,7 +62,7 @@ class config_provider
      */
     public function issuer()
     {
-        return $this->resolve('SNAPDRAGON_JWT_ISSUER', 'snapdragon_forumapi_issuer', '');
+        return $this->resolve('HUGMESH_JWT_ISSUER', 'hugmesh_forumapi_issuer', '');
     }
 
     /**
@@ -70,7 +70,7 @@ class config_provider
      */
     public function audience()
     {
-        return $this->resolve('SNAPDRAGON_JWT_AUDIENCE', 'snapdragon_forumapi_audience', '');
+        return $this->resolve('HUGMESH_JWT_AUDIENCE', 'hugmesh_forumapi_audience', '');
     }
 
     /**
@@ -78,7 +78,7 @@ class config_provider
      */
     public function leeway()
     {
-        return (int) $this->resolve('SNAPDRAGON_JWT_LEEWAY', 'snapdragon_forumapi_leeway', '30');
+        return (int) $this->resolve('HUGMESH_JWT_LEEWAY', 'hugmesh_forumapi_leeway', '30');
     }
 
     /**
@@ -86,7 +86,7 @@ class config_provider
      */
     public function default_forum_id()
     {
-        return (int) $this->resolve('SNAPDRAGON_DEFAULT_FORUM_ID', 'snapdragon_forumapi_default_forum_id', '2');
+        return (int) $this->resolve('HUGMESH_DEFAULT_FORUM_ID', 'hugmesh_forumapi_default_forum_id', '2');
     }
 
     /**

@@ -1,17 +1,17 @@
 <?php
 /**
- * Snapdragon Forum API — initial schema migration.
+ * HugMesh Forum API — initial schema migration.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\migrations;
+namespace hugmesh\forumapi\migrations;
 
 /**
  * Creates the Casdoor-subject -> phpBB user_id mapping table.
  *
- * We use a SIDE TABLE ({@code phpbb_snapdragon_casdoor_map}) rather than a column on
+ * We use a SIDE TABLE ({@code phpbb_hugmesh_casdoor_map}) rather than a column on
  * {@code phpbb_users} so the mapping is fully owned by this extension (clean
  * install/uninstall, no core-table coupling, unique-keyed by the immutable Casdoor
  * {@code sub}). The mapping is resolved-or-created on {@code POST /users/{sub}/ensure}
@@ -26,7 +26,7 @@ class m1_initial_schema extends \phpbb\db\migration\migration
      */
     public function effectively_installed()
     {
-        return $this->db_tools->sql_table_exists($this->table_prefix . 'snapdragon_casdoor_map');
+        return $this->db_tools->sql_table_exists($this->table_prefix . 'hugmesh_casdoor_map');
     }
 
     /**
@@ -46,7 +46,7 @@ class m1_initial_schema extends \phpbb\db\migration\migration
     {
         return [
             'add_tables' => [
-                $this->table_prefix . 'snapdragon_casdoor_map' => [
+                $this->table_prefix . 'hugmesh_casdoor_map' => [
                     'COLUMNS' => [
                         'map_id'        => ['UINT', null, 'auto_increment'],
                         'casdoor_sub'   => ['VCHAR:255', ''],
@@ -73,7 +73,7 @@ class m1_initial_schema extends \phpbb\db\migration\migration
     {
         return [
             'drop_tables' => [
-                $this->table_prefix . 'snapdragon_casdoor_map',
+                $this->table_prefix . 'hugmesh_casdoor_map',
             ],
         ];
     }

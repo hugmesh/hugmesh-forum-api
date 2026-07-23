@@ -12,18 +12,18 @@
  *   - that a happy action is returned through guard() unchanged;
  *   - that an unexpected Throwable becomes a generic 500 without leaking internals.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\tests;
+namespace hugmesh\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\forumapi\auth\auth_exception;
-use snapdragon\forumapi\auth\authenticator;
-use snapdragon\forumapi\auth\jwks_provider;
-use snapdragon\forumapi\auth\jwt_verifier;
-use snapdragon\forumapi\controller\base_controller;
+use hugmesh\forumapi\auth\auth_exception;
+use hugmesh\forumapi\auth\authenticator;
+use hugmesh\forumapi\auth\jwks_provider;
+use hugmesh\forumapi\auth\jwt_verifier;
+use hugmesh\forumapi\controller\base_controller;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 

@@ -5,15 +5,15 @@
  * through a REAL s9e\TextFormatter\Configurator/Parser/Renderer, exactly the mechanism phpBB
  * uses for its own BBCode/smiley pipeline (core.text_formatter_s9e_configure_after).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\tests;
+namespace hugmesh\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
 use s9e\TextFormatter\Configurator;
-use snapdragon\forumapi\event\main_listener;
+use hugmesh\forumapi\event\main_listener;
 
 class main_listener_test extends TestCase
 {

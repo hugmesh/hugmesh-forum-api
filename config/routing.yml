@@ -1,6 +1,6 @@
-# Snapdragon Forum API — route definitions.
+# HugMesh Forum API — route definitions.
 #
-# All paths are under the base /api/v1/snapdragon (the prefix the forum-bff
+# All paths are under the base /api/v1/hugmesh (the prefix the forum-bff
 # PhpbbApiClient / PhpbbAdminClient call). Symfony routing (phpBB 3.3 / HttpKernel).
 # _controller references service.id:method (single colon).
 
@@ -8,180 +8,180 @@
 # The deployment probes this path with no JWT; it must answer 200 without auth.
 # Safe: ClusterIP-only + NetworkPolicy-locked Service, static body, no DB/forum data.
 
-snapdragon_forumapi_health:
-    path: /api/v1/snapdragon/health
+hugmesh_forumapi_health:
+    path: /api/v1/hugmesh/health
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:health
+        _controller: hugmesh.forumapi.controller.read:health
 
 # ── Reads (any authenticated user) ──────────────────────────────────────
 
-snapdragon_forumapi_categories:
-    path: /api/v1/snapdragon/categories
+hugmesh_forumapi_categories:
+    path: /api/v1/hugmesh/categories
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:categories
+        _controller: hugmesh.forumapi.controller.read:categories
 
-snapdragon_forumapi_topics:
-    path: /api/v1/snapdragon/topics
+hugmesh_forumapi_topics:
+    path: /api/v1/hugmesh/topics
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:topics
+        _controller: hugmesh.forumapi.controller.read:topics
 
-snapdragon_forumapi_topic:
-    path: /api/v1/snapdragon/topics/{id}
+hugmesh_forumapi_topic:
+    path: /api/v1/hugmesh/topics/{id}
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:topic
+        _controller: hugmesh.forumapi.controller.read:topic
     requirements:
         id: \d+
 
-snapdragon_forumapi_topic_replies:
-    path: /api/v1/snapdragon/topics/{id}/replies
+hugmesh_forumapi_topic_replies:
+    path: /api/v1/hugmesh/topics/{id}/replies
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:replies
+        _controller: hugmesh.forumapi.controller.read:replies
     requirements:
         id: \d+
 
-snapdragon_forumapi_post:
-    path: /api/v1/snapdragon/posts/{id}
+hugmesh_forumapi_post:
+    path: /api/v1/hugmesh/posts/{id}
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:post
+        _controller: hugmesh.forumapi.controller.read:post
     requirements:
         id: \d+
 
-snapdragon_forumapi_stats:
-    path: /api/v1/snapdragon/stats
+hugmesh_forumapi_stats:
+    path: /api/v1/hugmesh/stats
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.read:stats
+        _controller: hugmesh.forumapi.controller.read:stats
 
 # ── Writes (acts-as-user; author = JWT sub) ─────────────────────────────
 
-snapdragon_forumapi_create_topic:
-    path: /api/v1/snapdragon/topics
+hugmesh_forumapi_create_topic:
+    path: /api/v1/hugmesh/topics
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.write:create_topic
+        _controller: hugmesh.forumapi.controller.write:create_topic
 
-snapdragon_forumapi_create_reply:
-    path: /api/v1/snapdragon/topics/{id}/replies
+hugmesh_forumapi_create_reply:
+    path: /api/v1/hugmesh/topics/{id}/replies
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.write:create_reply
+        _controller: hugmesh.forumapi.controller.write:create_reply
     requirements:
         id: \d+
 
-snapdragon_forumapi_edit_post:
-    path: /api/v1/snapdragon/posts/{id}
+hugmesh_forumapi_edit_post:
+    path: /api/v1/hugmesh/posts/{id}
     methods: [PUT]
     defaults:
-        _controller: snapdragon.forumapi.controller.write:edit_post
+        _controller: hugmesh.forumapi.controller.write:edit_post
     requirements:
         id: \d+
 
-snapdragon_forumapi_delete_post:
-    path: /api/v1/snapdragon/posts/{id}
+hugmesh_forumapi_delete_post:
+    path: /api/v1/hugmesh/posts/{id}
     methods: [DELETE]
     defaults:
-        _controller: snapdragon.forumapi.controller.write:delete_post
+        _controller: hugmesh.forumapi.controller.write:delete_post
     requirements:
         id: \d+
 
-snapdragon_forumapi_moderate_topic:
-    path: /api/v1/snapdragon/moderation/topics/{id}
+hugmesh_forumapi_moderate_topic:
+    path: /api/v1/hugmesh/moderation/topics/{id}
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.write:moderate_topic
+        _controller: hugmesh.forumapi.controller.write:moderate_topic
     requirements:
         id: \d+
 
 # ── Admin / declarative (ROLE_ADMIN) ────────────────────────────────────
 
-snapdragon_forumapi_ensure_user:
-    path: /api/v1/snapdragon/users/{sub}/ensure
+hugmesh_forumapi_ensure_user:
+    path: /api/v1/hugmesh/users/{sub}/ensure
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:ensure_user
+        _controller: hugmesh.forumapi.controller.admin:ensure_user
     requirements:
         sub: '[^/]+'
 
-snapdragon_forumapi_set_user_groups:
-    path: /api/v1/snapdragon/users/{sub}/groups
+hugmesh_forumapi_set_user_groups:
+    path: /api/v1/hugmesh/users/{sub}/groups
     methods: [PUT]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:set_user_groups
+        _controller: hugmesh.forumapi.controller.admin:set_user_groups
     requirements:
         sub: '[^/]+'
 
-snapdragon_forumapi_admin_styles:
-    path: /api/v1/snapdragon/admin/styles
+hugmesh_forumapi_admin_styles:
+    path: /api/v1/hugmesh/admin/styles
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:install_style
+        _controller: hugmesh.forumapi.controller.admin:install_style
 
-snapdragon_forumapi_admin_extensions:
-    path: /api/v1/snapdragon/admin/extensions
+hugmesh_forumapi_admin_extensions:
+    path: /api/v1/hugmesh/admin/extensions
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:install_extension
+        _controller: hugmesh.forumapi.controller.admin:install_extension
 
-snapdragon_forumapi_admin_users:
-    path: /api/v1/snapdragon/admin/users
+hugmesh_forumapi_admin_users:
+    path: /api/v1/hugmesh/admin/users
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:list_users
+        _controller: hugmesh.forumapi.controller.admin:list_users
 
-snapdragon_forumapi_admin_user:
-    path: /api/v1/snapdragon/admin/users/{sub}
+hugmesh_forumapi_admin_user:
+    path: /api/v1/hugmesh/admin/users/{sub}
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:get_user
+        _controller: hugmesh.forumapi.controller.admin:get_user
     requirements:
         sub: '[^/]+'
 
-snapdragon_forumapi_admin_categories:
-    path: /api/v1/snapdragon/admin/categories
+hugmesh_forumapi_admin_categories:
+    path: /api/v1/hugmesh/admin/categories
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:create_category
+        _controller: hugmesh.forumapi.controller.admin:create_category
 
-snapdragon_forumapi_admin_moderation_queue:
-    path: /api/v1/snapdragon/admin/moderation-queue
+hugmesh_forumapi_admin_moderation_queue:
+    path: /api/v1/hugmesh/admin/moderation-queue
     methods: [GET]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:moderation_queue
+        _controller: hugmesh.forumapi.controller.admin:moderation_queue
 
-snapdragon_forumapi_admin_moderation_approve:
-    path: /api/v1/snapdragon/admin/moderation/{id}/approve
+hugmesh_forumapi_admin_moderation_approve:
+    path: /api/v1/hugmesh/admin/moderation/{id}/approve
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:approve
+        _controller: hugmesh.forumapi.controller.admin:approve
     requirements:
         id: \d+
 
-snapdragon_forumapi_admin_moderation_reject:
-    path: /api/v1/snapdragon/admin/moderation/{id}/reject
+hugmesh_forumapi_admin_moderation_reject:
+    path: /api/v1/hugmesh/admin/moderation/{id}/reject
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:reject
+        _controller: hugmesh.forumapi.controller.admin:reject
     requirements:
         id: \d+
 
-snapdragon_forumapi_admin_ban_user:
-    path: /api/v1/snapdragon/admin/users/{sub}/ban
+hugmesh_forumapi_admin_ban_user:
+    path: /api/v1/hugmesh/admin/users/{sub}/ban
     methods: [POST]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:ban_user
+        _controller: hugmesh.forumapi.controller.admin:ban_user
     requirements:
         sub: '[^/]+'
 
-snapdragon_forumapi_admin_unban_user:
-    path: /api/v1/snapdragon/admin/users/{sub}/ban
+hugmesh_forumapi_admin_unban_user:
+    path: /api/v1/hugmesh/admin/users/{sub}/ban
     methods: [DELETE]
     defaults:
-        _controller: snapdragon.forumapi.controller.admin:unban_user
+        _controller: hugmesh.forumapi.controller.admin:unban_user
     requirements:
         sub: '[^/]+'

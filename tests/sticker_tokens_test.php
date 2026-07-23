@@ -7,14 +7,14 @@
  * (empirically verified against a real s9e\TextFormatter\Configurator too — see
  * main_listener_test.php for the equivalent scenarios through the actual phpBB render hook).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\tests;
+namespace hugmesh\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\forumapi\text\sticker_tokens;
+use hugmesh\forumapi\text\sticker_tokens;
 
 class sticker_tokens_test extends TestCase
 {

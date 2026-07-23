@@ -1,18 +1,18 @@
 <?php
 /**
- * Snapdragon Forum API — request authenticator (header extraction + verification + authz).
+ * HugMesh Forum API — request authenticator (header extraction + verification + authz).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\auth;
+namespace hugmesh\forumapi\auth;
 
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * The single entry-point controllers use to authenticate a request. It extracts the
- * Casdoor JWT from BOTH {@code Authorization: Bearer} and {@code X-Snapdragon-JWT}
+ * Casdoor JWT from BOTH {@code Authorization: Bearer} and {@code X-HugMesh-JWT}
  * (cross-checking they agree when both are present), verifies it via {@see jwt_verifier},
  * and exposes per-route authorization helpers (fail-closed).
  */
@@ -21,7 +21,7 @@ class authenticator
     /**
      * The extra header the forum-bff sends alongside Authorization (PhpbbWebClientConfig).
      */
-    public const SNAPDRAGON_JWT_HEADER = 'X-Snapdragon-JWT';
+    public const HUGMESH_JWT_HEADER = 'X-HugMesh-JWT';
 
     /**
      * @var jwt_verifier
@@ -47,12 +47,12 @@ class authenticator
     public function authenticate(Request $request)
     {
         $bearer = $this->extract_bearer($request);
-        $custom = trim((string) $request->headers->get(self::SNAPDRAGON_JWT_HEADER, ''));
+        $custom = trim((string) $request->headers->get(self::HUGMESH_JWT_HEADER, ''));
 
         // Both present => they MUST be the same token (no header-confusion downgrade).
         if ($bearer !== '' && $custom !== '' && !hash_equals($bearer, $custom))
         {
-            throw auth_exception::unauthorized('Bearer and X-Snapdragon-JWT tokens disagree.');
+            throw auth_exception::unauthorized('Bearer and X-HugMesh-JWT tokens disagree.');
         }
 
         $token = $bearer !== '' ? $bearer : $custom;

@@ -14,14 +14,14 @@
  *   - base_post_data(): force_approved_state=1 and the DELIBERATE ABSENCE of any
  *     'force_visibility' key (re-introducing it silently forces every post unapproved).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\tests;
+namespace hugmesh\forumapi\tests;
 
 use PHPUnit\Framework\TestCase;
-use snapdragon\forumapi\service\posting_service;
+use hugmesh\forumapi\service\posting_service;
 
 /**
  * A fake phpBB $user: just the public ->data property the impersonation window reads and

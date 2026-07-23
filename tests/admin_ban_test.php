@@ -13,7 +13,7 @@
  *  4. unban_user_removesFromBanlistAndRestoresNormal — DELETE ban + UPDATE users + INSERT REGISTERED + DELETE sessions
  *  5. unban_user_throwsNotFound_whenSubUnknown       — 404 auth_exception when sub unmapped
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
@@ -39,11 +39,11 @@ namespace phpbb\config
     }
 }
 
-namespace snapdragon\forumapi\tests
+namespace hugmesh\forumapi\tests
 {
     use PHPUnit\Framework\TestCase;
-    use snapdragon\forumapi\service\admin_service;
-    use snapdragon\forumapi\auth\auth_exception;
+    use hugmesh\forumapi\service\admin_service;
+    use hugmesh\forumapi\auth\auth_exception;
 
     /**
      * Recording fake phpBB DB driver.
@@ -112,7 +112,7 @@ namespace snapdragon\forumapi\tests
      *
      * Mirrors the probe-subclass pattern used in user_mapper_test.php.
      */
-    class ban_user_mapper_stub extends \snapdragon\forumapi\service\user_mapper
+    class ban_user_mapper_stub extends \hugmesh\forumapi\service\user_mapper
     {
         /** @var int|null */
         private $stub_user_id;
@@ -150,7 +150,7 @@ namespace snapdragon\forumapi\tests
         private function make_service(ban_recording_db $db, ban_user_mapper_stub $mapper): admin_service
         {
             // forum_repository($db, $table_prefix) — db param is untyped, null is fine here.
-            $repo   = new \snapdragon\forumapi\service\forum_repository(null, self::TABLE_PREFIX);
+            $repo   = new \hugmesh\forumapi\service\forum_repository(null, self::TABLE_PREFIX);
             $config = new \phpbb\config\config();
 
             return new admin_service(

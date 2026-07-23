@@ -1,18 +1,18 @@
 <?php
 /**
- * Snapdragon Forum API — Casdoor sub -> phpBB user resolution / creation / group sync.
+ * HugMesh Forum API — Casdoor sub -> phpBB user resolution / creation / group sync.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\service;
+namespace hugmesh\forumapi\service;
 
-use snapdragon\forumapi\auth\principal;
+use hugmesh\forumapi\auth\principal;
 
 /**
  * Maps the immutable Casdoor {@code sub} to a phpBB {@code user_id} via the
- * {@code phpbb_snapdragon_casdoor_map} side table, lazily creating the phpBB user with
+ * {@code phpbb_hugmesh_casdoor_map} side table, lazily creating the phpBB user with
  * {@code user_add()} on first use. Also performs the DECLARATIVE group convergence for
  * {@code PUT /users/{sub}/groups}.
  *
@@ -85,7 +85,7 @@ class user_mapper
      */
     private function map_table()
     {
-        return $this->table_prefix . 'snapdragon_casdoor_map';
+        return $this->table_prefix . 'hugmesh_casdoor_map';
     }
 
     /**
@@ -173,7 +173,7 @@ class user_mapper
 
         if (!$user_id)
         {
-            throw new \RuntimeException('Snapdragon Forum API: user_add() failed for sub ' . $p->get_subject());
+            throw new \RuntimeException('HugMesh Forum API: user_add() failed for sub ' . $p->get_subject());
         }
 
         return (int) $user_id;

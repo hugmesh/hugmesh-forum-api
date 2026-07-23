@@ -1,17 +1,17 @@
 <?php
 /**
- * Snapdragon Forum API — server-side `:snap-sticker:<slug>:` token rendering.
+ * HugMesh Forum API — server-side `:snap-sticker:<slug>:` token rendering.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\text;
+namespace hugmesh\forumapi\text;
 
 /**
  * Renders `:snap-sticker:<slug>:` post tokens into the SAME `<img>` markup forum-ui's
  * client-side DOM transform produces (`transformStickerTokens()` in
- * `snapdragon-forum-ui/src/app/stickers.ts`, merged Snapdragon-Systems/snapdragon-forum-ui#22,
+ * `hugmesh-forum-ui/src/app/stickers.ts`, merged HugMesh/hugmesh-forum-ui#22,
  * commit 549d7d1), so a raw API consumer — anything that is NOT forum-ui, which currently
  * only renders stickers in the browser after the fact — gets an equivalent visual result
  * straight from this extension's JSON responses instead of the literal token text.
@@ -27,7 +27,7 @@ namespace snapdragon\forumapi\text;
  *                       text, exactly like a malformed token.
  *
  * KNOWN PLATFORM GAP (not introduced by, or fixable within, this class): as of the merge
- * above, `snapdragon-user-bff-api`'s `StickerController` does NOT actually implement a
+ * above, `hugmesh-user-bff-api`'s `StickerController` does NOT actually implement a
  * `GET {API_BASE}/{slug}/body` route — its own class doc states "There is deliberately NO
  * BFF serve endpoint for the sticker image" (stickers resolve via a Matrix `mxc://` fetched
  * direct-to-homeserver, keyed by `id`/`expression`, not by `slug`, which does not exist as a
@@ -47,10 +47,10 @@ namespace snapdragon\forumapi\text;
  *
  * Framework-independent (no phpBB/Symfony dependency) so it is directly unit-testable and
  * reusable from two call sites:
- *   - {@see \snapdragon\forumapi\event\main_listener}, which registers the equivalent
+ *   - {@see \hugmesh\forumapi\event\main_listener}, which registers the equivalent
  *     transform as a real phpBB/s9e\TextFormatter custom tag (the phpBB extension
  *     mechanism, `core.text_formatter_s9e_configure_after`) for any board-rendered path;
- *   - {@see \snapdragon\forumapi\service\forum_repository}, the path that ACTUALLY produces
+ *   - {@see \hugmesh\forumapi\service\forum_repository}, the path that ACTUALLY produces
  *     this extension's `Reply.body` / `QueueItem.excerpt` JSON output today — a headless
  *     plain-text read path that does not itself invoke phpBB's s9e renderer (see
  *     `forum_repository::strip_text()`) — so THIS is the call site that closes the gap raw
@@ -60,13 +60,13 @@ class sticker_tokens
 {
     /**
      * The sticker slug charset — mirrors forum-ui's `STICKER_SLUG_RE`
-     * (`snapdragon-forum-ui/src/app/stickers.ts`).
+     * (`hugmesh-forum-ui/src/app/stickers.ts`).
      */
     const SLUG_PATTERN = '[a-z0-9_-]{1,64}';
 
     /**
      * Same-origin base for the user-bff character/sticker asset endpoint — mirrors
-     * forum-ui's `STICKER_API_BASE` (`snapdragon-forum-ui/src/app/stickers.ts`).
+     * forum-ui's `STICKER_API_BASE` (`hugmesh-forum-ui/src/app/stickers.ts`).
      */
     const API_BASE = '/bff/user/character/stickers';
 

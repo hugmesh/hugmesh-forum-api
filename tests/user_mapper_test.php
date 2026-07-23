@@ -16,7 +16,7 @@
  * is the always-present default group and must never be passed to the remove call, while
  * converging to ADMINISTRATORS / GLOBAL_MODERATORS / NONE must keep it.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
@@ -29,22 +29,22 @@ namespace
     {
         function group_user_add($group_id, $user_ids)
         {
-            \snapdragon\forumapi\tests\group_calls::$adds[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
+            \hugmesh\forumapi\tests\group_calls::$adds[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
         }
     }
     if (!function_exists('group_user_del'))
     {
         function group_user_del($group_id, $user_ids)
         {
-            \snapdragon\forumapi\tests\group_calls::$dels[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
+            \hugmesh\forumapi\tests\group_calls::$dels[] = ['group_id' => (int) $group_id, 'user_ids' => $user_ids];
         }
     }
 }
 
-namespace snapdragon\forumapi\tests
+namespace hugmesh\forumapi\tests
 {
     use PHPUnit\Framework\TestCase;
-    use snapdragon\forumapi\service\user_mapper;
+    use hugmesh\forumapi\service\user_mapper;
 
     /**
      * Static recorder the global group_user_add/del shims forward into.

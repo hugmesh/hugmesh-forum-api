@@ -1,14 +1,14 @@
 <?php
 /**
- * Snapdragon Forum API — read-side repository mapping phpBB tables to the DTO shapes.
+ * HugMesh Forum API — read-side repository mapping phpBB tables to the DTO shapes.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\service;
+namespace hugmesh\forumapi\service;
 
-use snapdragon\forumapi\text\sticker_tokens;
+use hugmesh\forumapi\text\sticker_tokens;
 
 /**
  * Reads phpBB forums/topics/posts/users via the injected DBAL connection and maps rows
@@ -16,11 +16,11 @@ use snapdragon\forumapi\text\sticker_tokens;
  * are emitted as ISO-8601 UTC strings (Jackson {@code Instant} compatible).
  *
  * The Casdoor sub for {@code authorSubject} is resolved by joining the poster's user_id
- * back through {@code phpbb_snapdragon_casdoor_map}; a phpBB user with no mapping (a
+ * back through {@code phpbb_hugmesh_casdoor_map}; a phpBB user with no mapping (a
  * native account) yields an empty {@code authorSubject}.
  *
  * {@code Reply.body} / {@code QueueItem.excerpt} additionally run through
- * {@see \snapdragon\forumapi\text\sticker_tokens::render()}, which renders any
+ * {@see \hugmesh\forumapi\text\sticker_tokens::render()}, which renders any
  * `:snap-sticker:<slug>:` token to the same `<img>` markup forum-ui's client-side transform
  * produces — so a raw API consumer (not just forum-ui) sees a rendered sticker rather than
  * the literal token.
@@ -218,7 +218,7 @@ class forum_repository
      */
     public function subject_for_user($user_id)
     {
-        $sql = 'SELECT casdoor_sub FROM ' . $this->table_prefix . 'snapdragon_casdoor_map
+        $sql = 'SELECT casdoor_sub FROM ' . $this->table_prefix . 'hugmesh_casdoor_map
             WHERE user_id = ' . (int) $user_id;
         $result = $this->db->sql_query($sql);
         $row = $this->db->sql_fetchrow($result);

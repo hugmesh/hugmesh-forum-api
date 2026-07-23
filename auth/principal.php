@@ -1,12 +1,12 @@
 <?php
 /**
- * Snapdragon Forum API — authenticated principal value object.
+ * HugMesh Forum API — authenticated principal value object.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\auth;
+namespace hugmesh\forumapi\auth;
 
 /**
  * An immutable, validated principal derived from a verified Casdoor JWT.

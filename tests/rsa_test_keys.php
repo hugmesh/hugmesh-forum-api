@@ -3,11 +3,11 @@
  * Test helper — generates an RSA keypair, the matching JWKS document, and signs
  * RS256 JWTs for the verifier unit tests.
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\tests;
+namespace hugmesh\forumapi\tests;
 
 use Firebase\JWT\JWT;
 

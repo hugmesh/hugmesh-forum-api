@@ -1,17 +1,17 @@
 <?php
 /**
- * Snapdragon Forum API — admin operations (user ensure/list, group sync, category, styles, extensions).
+ * HugMesh Forum API — admin operations (user ensure/list, group sync, category, styles, extensions).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\service;
+namespace hugmesh\forumapi\service;
 
-use snapdragon\forumapi\auth\principal;
+use hugmesh\forumapi\auth\principal;
 
 /**
- * Backs {@see \snapdragon\forumapi\controller\admin_controller}. Bridges path-keyed
+ * Backs {@see \hugmesh\forumapi\controller\admin_controller}. Bridges path-keyed
  * Casdoor subs to phpBB users, converges declarative groups, manages forums (categories),
  * and enables styles/extensions via phpBB's own managers.
  *
@@ -126,7 +126,7 @@ class admin_service
         $this->user_mapper->converge_groups($user_id, $target);
 
         // Stamp last_synced on the mapping row.
-        $sql = 'UPDATE ' . $this->table_prefix . 'snapdragon_casdoor_map
+        $sql = 'UPDATE ' . $this->table_prefix . 'hugmesh_casdoor_map
             SET last_synced = ' . time() . "
             WHERE casdoor_sub = '" . $this->db->sql_escape((string) $sub) . "'";
         $this->db->sql_query($sql);
@@ -180,7 +180,7 @@ class admin_service
      */
     public function list_users()
     {
-        $sql = 'SELECT casdoor_sub, user_id FROM ' . $this->table_prefix . 'snapdragon_casdoor_map
+        $sql = 'SELECT casdoor_sub, user_id FROM ' . $this->table_prefix . 'hugmesh_casdoor_map
             ORDER BY user_id ASC';
         $result = $this->db->sql_query($sql);
 
@@ -241,7 +241,7 @@ class admin_service
         $phpbb_id = $this->user_mapper->find_user_id((string) $casdoor_sub);
         if ($phpbb_id === null)
         {
-            throw \snapdragon\forumapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
+            throw \hugmesh\forumapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
         }
 
         $banlist_table    = $this->table_prefix . 'banlist';
@@ -333,7 +333,7 @@ class admin_service
         $phpbb_id = $this->user_mapper->find_user_id((string) $casdoor_sub);
         if ($phpbb_id === null)
         {
-            throw \snapdragon\forumapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
+            throw \hugmesh\forumapi\auth\auth_exception::not_found('No phpBB user mapped for that subject.');
         }
 
         $banlist_table    = $this->table_prefix . 'banlist';
@@ -452,7 +452,7 @@ class admin_service
 
         if (!empty($errors))
         {
-            throw new \RuntimeException('Snapdragon Forum API: forum create failed: ' . implode('; ', (array) $errors));
+            throw new \RuntimeException('HugMesh Forum API: forum create failed: ' . implode('; ', (array) $errors));
         }
 
         $forum_id = (int) $forum_data['forum_id'];
@@ -503,7 +503,7 @@ class admin_service
     {
         if ($this->container === null)
         {
-            throw new \RuntimeException('Snapdragon Forum API: no container for extension manager.');
+            throw new \RuntimeException('HugMesh Forum API: no container for extension manager.');
         }
         /** @var \phpbb\extension\manager $ext_manager */
         $ext_manager = $this->container->get('ext.manager');

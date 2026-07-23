@@ -1,19 +1,19 @@
 <?php
 /**
- * Snapdragon Forum API — write endpoints (acts-as-user; author = JWT sub).
+ * HugMesh Forum API — write endpoints (acts-as-user; author = JWT sub).
  *
- * @copyright (c) 2026 Snapdragon Systems
+ * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
  */
 
-namespace snapdragon\forumapi\controller;
+namespace hugmesh\forumapi\controller;
 
-use snapdragon\forumapi\auth\authenticator;
-use snapdragon\forumapi\auth\auth_exception;
-use snapdragon\forumapi\config_provider;
-use snapdragon\forumapi\service\forum_repository;
-use snapdragon\forumapi\service\posting_service;
-use snapdragon\forumapi\service\user_mapper;
+use hugmesh\forumapi\auth\authenticator;
+use hugmesh\forumapi\auth\auth_exception;
+use hugmesh\forumapi\config_provider;
+use hugmesh\forumapi\service\forum_repository;
+use hugmesh\forumapi\service\posting_service;
+use hugmesh\forumapi\service\user_mapper;
 use Symfony\Component\HttpFoundation\Request;
 
 /**

@@ -1,4 +1,4 @@
-# Snapdragon Forum API — GitLab CI (this org uses GitLab CI, not GitHub Actions).
+# HugMesh Forum API — GitLab CI (this org uses GitLab CI, not GitHub Actions).
 #
 # Stages: lint (php -l every file) -> validate (composer) -> test (phpunit) ->
 #         build (bake + push the custom phpBB image).
@@ -54,9 +54,9 @@ phpunit:
 
 # -----------------------------------------------------------------------------
 # build:image — bake the custom phpBB image (official phpBB 3.3.11 + THIS
-# extension at ext/snapdragon/forumapi, baked by the Dockerfile) and push it to
+# extension at ext/hugmesh/forumapi, baked by the Dockerfile) and push it to
 # the in-cluster GitLab container registry. The forum deployment
-# (snapdragon-generator specs/cluster/manifests/forum/phpbb.yaml) runs this image:
+# (hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml) runs this image:
 # its initContainer installs + locks down phpBB, and the image entrypoint enables
 # the extension on boot. Until this job existed nothing published the image, so
 # the forum could never come up — this is the load-bearing go-live step.
@@ -66,18 +66,18 @@ phpunit:
 # the moving `dev` tag is what the dev kustomize overlay / forum manifest tracks.
 # No build secret is needed — the Dockerfile pulls only public phpBB + composer and
 # the extension source IS the build context (contrast the Maven services, which
-# mount CI_JOB_TOKEN to resolve the private snapdragon-commons artifact).
+# mount CI_JOB_TOKEN to resolve the private hugmesh-commons artifact).
 #
-# Mirrors the org pattern (snapdragon-forum-bff-api build:image): the privileged
+# Mirrors the org pattern (hugmesh-forum-bff-api build:image): the privileged
 # x86 shell runner provides the host Docker daemon; docker login uses the
 # GitLab-injected CI_REGISTRY_USER / CI_REGISTRY_PASSWORD / CI_REGISTRY. The
-# deployment's logical image `snapdragon-systems/phpbb:dev` is resolved to
+# deployment's logical image `hugmesh-systems/phpbb:dev` is resolved to
 # $CI_REGISTRY_IMAGE:dev by the generator's image mapping at render time.
 # -----------------------------------------------------------------------------
 build:image:
     stage: build
     needs: [phpunit]
-    tags: [snapdragon-x86, privileged]
+    tags: [hugmesh-x86, privileged]
     rules:
         - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
         - if: '$CI_COMMIT_TAG'
