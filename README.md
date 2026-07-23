@@ -162,16 +162,15 @@ that enables the extension via `phpbbcli` on first boot.
 
 **Cross-repo drift (as of this writing):** the cluster manifests
 (`hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`snapdragon-forum`) have not picked up this repo's `hugmesh/forumapi` rename yet — they
-still set `PHPBB_EXTENSION=snapdragon/forumapi`, build/reference the image tag
-`snapdragon-systems/phpbb:dev`, and inject the pre-rename `SNAPDRAGON_JWKS_URI` /
-`SNAPDRAGON_JWT_ISSUER` env vars, none of which this extension reads anymore — it reads
-`HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` (see Auth above). Deployed as currently
-written, the extension fails closed (missing issuer → every request gets `401`), not
-open, but it also never enables/loads as `snapdragon/forumapi` no longer exists in this
-repo. See **Generator follow-ups** below for the full punch list. The manifests do
+`hugmesh-forum`) have mostly caught up with this repo's rename (generator #437):
+`PHPBB_EXTENSION` is already `hugmesh/forumapi` and the injected auth env vars are
+already `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER`, matching what this extension actually
+reads (see Auth above). The one piece still stale is the baked image reference itself —
+both the `bootstrap` initContainer and the main `phpbb` container still pull
+`snapdragon-systems/phpbb:dev`, not the `hugmesh-systems/phpbb:dev` tag this repo's
+`Dockerfile` actually produces. See **Generator follow-ups** below. The manifests
 correctly point the forum-bff WebClient at
-`http://phpbb.snapdragon-forum.svc.cluster.local:80`.
+`http://phpbb.hugmesh-forum.svc.cluster.local:80`.
 
 ### Manual (existing phpBB 3.3)
 
@@ -198,7 +197,7 @@ against a stub. Once this extension is validated on-cluster, flipping it on is
 ```yaml
 # forum-bff env
 PHPBB_ENABLED: "true"
-PHPBB_API_BASE_URL: "http://phpbb.snapdragon-forum.svc.cluster.local:80"
+PHPBB_API_BASE_URL: "http://phpbb.hugmesh-forum.svc.cluster.local:80"
 ```
 
 The client then forwards the user's Casdoor JWT (Bearer + `X-HugMesh-JWT`) on every
@@ -271,13 +270,12 @@ extension bug.
 
 **Generator follow-ups for true on-cluster go-live:**
 
-- `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
-  **`hugmesh/forumapi`** name (no hyphen) and run the **`hugmesh-systems/phpbb:dev`**
-  image this repo builds.
-- The same manifest must rename the injected env vars from `SNAPDRAGON_JWKS_URI` /
-  `SNAPDRAGON_JWT_ISSUER` to **`HUGMESH_JWKS_URI`** / **`HUGMESH_JWT_ISSUER`** — this
-  extension stopped reading the old names in the HugMesh rebrand (see Auth above), so as
-  currently written the manifest injects config this extension never sees.
+- `specs/cluster/manifests/forum/phpbb.yaml` (both the `bootstrap` initContainer and the
+  main `phpbb` container) must be repointed from the image tag `snapdragon-systems/phpbb:dev`
+  to **`hugmesh-systems/phpbb:dev`** — the tag this repo's `Dockerfile` actually
+  produces. This is the one remaining piece of drift: `PHPBB_EXTENSION` (already
+  `hugmesh/forumapi`) and the injected `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` env vars
+  are already correct (generator #437).
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
   board-disable flag.
 - The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) is **resolved**: Apache now
