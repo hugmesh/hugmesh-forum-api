@@ -142,6 +142,12 @@ secret is committed**. See `.env.example`.
   groups (`group_user_add` / `group_user_del`). Non-managed memberships are untouched.
 - **Reads** query phpBB tables via the injected DBAL connection and map to the DTOs;
   stats are `COUNT` queries (`source = "live"`).
+- **Sticker tokens**: `:snap-sticker:<slug>:` in stored post text is rendered server-side
+  (`text/sticker_tokens.php`) into a same-origin `<img class="forum-sticker">` tag before
+  `Reply.body` / `QueueItem.excerpt` are returned — so those two JSON fields can contain
+  embedded HTML, not just plain text. `event/main_listener.php` also hooks phpBB's own
+  s9e text-formatter (`core.text_formatter_s9e_configure_after`) so the same token
+  grammar renders identically if phpBB's own pipeline ever displays these posts.
 
 ---
 
@@ -149,15 +155,22 @@ secret is committed**. See `.env.example`.
 
 ### Baked image (deployment)
 
-The `Dockerfile` produces `hugmesh-systems/phpbb:dev`: official phpBB 3.3 on
-`php:8.1-apache`, this extension at `ext/hugmesh/forumapi/`, `composer install` for
-`firebase/php-jwt`, and an entrypoint that enables the extension via `phpbbcli` on first
-boot. The deployment
+The `Dockerfile` produces the image the deployment logically references as
+`hugmesh-systems/phpbb:dev`: official phpBB 3.3 on `php:8.1-apache`, this extension at
+`ext/hugmesh/forumapi/`, `composer install` for `firebase/php-jwt`, and an entrypoint
+that enables the extension via `phpbbcli` on first boot.
+
+**Cross-repo drift (as of this writing):** the cluster manifests
 (`hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`snapdragon-forum`) sets `PHPBB_EXTENSION=hugmesh/forumapi`, injects
-`HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` from a Secret, locks down native
-login/ACP, and points the forum-bff WebClient at
-`http://phpbb.snapdragon-forum.svc.cluster.local:80`.
+`hugmesh-forum`) have mostly caught up with this repo's rename (generator #437):
+`PHPBB_EXTENSION` is already `hugmesh/forumapi` and the injected auth env vars are
+already `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER`, matching what this extension actually
+reads (see Auth above). The one piece still stale is the baked image reference itself —
+both the `bootstrap` initContainer and the main `phpbb` container still pull
+`snapdragon-systems/phpbb:dev`, not the `hugmesh-systems/phpbb:dev` tag this repo's
+`Dockerfile` actually produces. See **Generator follow-ups** below. The manifests
+correctly point the forum-bff WebClient at
+`http://phpbb.hugmesh-forum.svc.cluster.local:80`.
 
 ### Manual (existing phpBB 3.3)
 
@@ -184,7 +197,7 @@ against a stub. Once this extension is validated on-cluster, flipping it on is
 ```yaml
 # forum-bff env
 PHPBB_ENABLED: "true"
-PHPBB_API_BASE_URL: "http://phpbb.snapdragon-forum.svc.cluster.local:80"
+PHPBB_API_BASE_URL: "http://phpbb.hugmesh-forum.svc.cluster.local:80"
 ```
 
 The client then forwards the user's Casdoor JWT (Bearer + `X-HugMesh-JWT`) on every
@@ -244,8 +257,12 @@ runner). (No GitHub Actions — this org uses GitLab CI.)
 - The schema **migration runs** — the `phpbb_hugmesh_casdoor_map` table is created.
 - The routes **register and match** — the full authed contract round-trip
   (acts-as-user authorship, moderation visibility, group sync, ownership/role gates) plus
-  every auth negative passed a MySQL docker-compose smoke (30/30) against a real install,
-  and the unauthenticated `/health` probe returns `200`.
+  every auth negative passed a docker-compose smoke (30/30) against a real install. That
+  full round-trip was proven on the **pre-migration MySQL-based harness**; since the local
+  harness moved to the cluster-shaped Postgres setup (PR #12), only the shallow checks have
+  been re-confirmed there (`/health` 200, `/stats` 401 fail-closed, board-lockdown 403,
+  restart-idempotent schema detection) — the deep round-trip has not yet been re-run
+  against Postgres, which is part of the gap called out below.
 
 **NOT yet live-proven:** end-to-end authed HTTP posting **through the route on a
 cluster-shaped (pgsql, init→main split) harness**. The bootstrap/lockdown concerns were
@@ -257,9 +274,12 @@ extension bug.
 
 **Generator follow-ups for true on-cluster go-live:**
 
-- `specs/cluster/manifests/forum/phpbb.yaml` and the forum bootstrap must use the
-  **`hugmesh/forumapi`** name (no hyphen) and run the **`hugmesh-systems/phpbb:dev`**
-  image this repo builds.
+- `specs/cluster/manifests/forum/phpbb.yaml` (both the `bootstrap` initContainer and the
+  main `phpbb` container) must be repointed from the image tag `snapdragon-systems/phpbb:dev`
+  to **`hugmesh-systems/phpbb:dev`** — the tag this repo's `Dockerfile` actually
+  produces. This is the one remaining piece of drift: `PHPBB_EXTENSION` (already
+  `hugmesh/forumapi`) and the injected `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` env vars
+  are already correct (generator #437).
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
   board-disable flag.
 - The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) is **resolved**: Apache now
