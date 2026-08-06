@@ -60,7 +60,7 @@ match the forum-bff Jackson records exactly; timestamps are ISO-8601 strings.
 | GET | `/admin/moderation-queue` | — | `QueueItem[]` | ADMIN |
 | POST | `/admin/moderation/{id}/approve` | — | 204 | ADMIN |
 | POST | `/admin/moderation/{id}/reject` | — | 204 | ADMIN |
-| POST | `/admin/users/{sub}/ban` | — | 204 | ADMIN |
+| POST | `/admin/users/{sub}/ban` | `BanRequest?` | 204 | ADMIN |
 | DELETE | `/admin/users/{sub}/ban` | — | 204 | ADMIN |
 
 ### JSON shapes
@@ -79,6 +79,7 @@ EditPost        { body:string }
 ModerationAction{ action:string(hide|lock|delete), reason:string }
 GroupAssignment { casdoorSubject:string, group:string, roles:string[], lastSynced:ISO8601 }
 CreateCategory  { name:string, description:string, parentId:long? }
+BanRequest      { reason:string? }
 ```
 
 > **`authorSubject` is NEVER read from a request body.** It is always the validated

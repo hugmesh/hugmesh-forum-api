@@ -53,7 +53,7 @@ LABEL org.opencontainers.image.title="hugmesh-systems/phpbb" \
       org.opencontainers.image.source="https://github.com/HugMesh/hugmesh-forum-api"
 
 # phpBB runtime PHP extensions.
-# NOTE: pgsql is REQUIRED — the snapdragon-forum deployment runs phpBB against Postgres
+# NOTE: pgsql is REQUIRED — the hugmesh-forum deployment runs phpBB against Postgres
 # ($dbms = phpbb\db\driver\postgres). Without the pgsql PHP extension phpBB cannot
 # connect to phpbb-db and the headless install/boot fails. libpq-dev provides its headers.
 # mysqli is kept for operators running a MANUAL MySQL-backed install only — the local
