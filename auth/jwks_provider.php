@@ -196,7 +196,16 @@ class jwks_provider
         // own keys), so we refuse anything that is not https:// outright.
         if (stripos((string) $url, 'https://') !== 0)
         {
-            throw new \RuntimeException('HugMesh Forum API: JWKS URI must be an absolute https:// URL.');
+            // Same dev-lane escape as config_provider::jwks_uri, and ONLY that:
+            // an explicit HUGMESH_JWKS_ALLOW_INSECURE_HTTP=1 permits an http://
+            // URL (the compose lane's in-network plain-http Casdoor). https://
+            // fetches below keep full VERIFYPEER/VERIFYHOST pinning regardless
+            // of the knob — it can never weaken a verified TLS fetch.
+            if (getenv('HUGMESH_JWKS_ALLOW_INSECURE_HTTP') !== '1'
+                || stripos((string) $url, 'http://') !== 0)
+            {
+                throw new \RuntimeException('HugMesh Forum API: JWKS URI must be an absolute https:// URL.');
+            }
         }
 
         if (function_exists('curl_init'))

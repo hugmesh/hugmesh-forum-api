@@ -52,7 +52,19 @@ class config_provider
         $uri = $this->resolve('HUGMESH_JWKS_URI', 'hugmesh_forumapi_jwks_uri', '');
         if ($uri !== '' && stripos($uri, 'https://') !== 0)
         {
-            throw new \RuntimeException('HugMesh Forum API: HUGMESH_JWKS_URI must be an absolute https:// URL.');
+            // DEV-LANE ESCAPE, DEFAULT OFF. The local docker-compose stack runs
+            // Casdoor plain-http on the in-cluster network (http://casdoor:8000)
+            // and terminates TLS only at the front door, so an https-only JWKS
+            // is unsatisfiable there without baking a per-machine CA into this
+            // image. The knob must be set to exactly '1' — any other value keeps
+            // the fail-closed behaviour — and it NEVER relaxes verification for
+            // https:// URLs (see jwks_provider::http_get, which keeps
+            // VERIFYPEER/VERIFYHOST pinned regardless). Do not set in a cluster.
+            if (getenv('HUGMESH_JWKS_ALLOW_INSECURE_HTTP') !== '1'
+                || stripos($uri, 'http://') !== 0)
+            {
+                throw new \RuntimeException('HugMesh Forum API: HUGMESH_JWKS_URI must be an absolute https:// URL.');
+            }
         }
         return $uri;
     }
