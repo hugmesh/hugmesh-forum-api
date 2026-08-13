@@ -1,0 +1,71 @@
+name: Release
+
+# Manual-only: this workflow is intentionally inert until a human enables it.
+# It is modeled on this repo's .gitlab-ci.yml (lint -> validate -> test -> build:image),
+# adapted to build+push the container image to GHCR instead of the in-cluster GitLab
+# registry.
+on:
+  workflow_dispatch: {}
+
+env:
+  IMAGE: ghcr.io/hugmesh-net/hugmesh-forum-api
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          extensions: zip, pgsql, mysqli, gd
+          coverage: none
+
+      - name: php -l (syntax check every file)
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            if ! php -l "$f" > /dev/null; then
+              echo "SYNTAX ERROR: $f"
+              php -l "$f"
+              fail=1
+            fi
+          done < <(find . -path ./vendor -prune -o -name '*.php' -print)
+          exit $fail
+
+      - name: composer validate
+        run: composer validate --no-check-publish
+
+      - name: composer install
+        run: composer install --no-interaction --prefer-dist
+
+      - name: phpunit
+        run: vendor/bin/phpunit --colors=never
+
+  build-image:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          pull: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:dev
