@@ -168,7 +168,7 @@ that enables the extension via `phpbbcli` on first boot.
 already `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER`, matching what this extension actually
 reads (see Auth above). The one piece still stale is the baked image reference itself —
 both the `bootstrap` initContainer and the main `phpbb` container still pull
-`snapdragon-systems/phpbb:dev`, not the `hugmesh-systems/phpbb:dev` tag this repo's
+`hugmesh/phpbb:dev`, not the `hugmesh-systems/phpbb:dev` tag this repo's
 `Dockerfile` actually produces. See **Generator follow-ups** below. The manifests
 correctly point the forum-bff WebClient at
 `http://phpbb.hugmesh-forum.svc.cluster.local:80`.
@@ -276,9 +276,9 @@ extension bug.
 **Generator follow-ups for true on-cluster go-live:**
 
 - `specs/cluster/manifests/forum/phpbb.yaml` (both the `bootstrap` initContainer and the
-  main `phpbb` container) must be repointed from the image tag `snapdragon-systems/phpbb:dev`
+  main `phpbb` container) must be repointed from the image tag `hugmesh/phpbb:dev`
   to **`hugmesh-systems/phpbb:dev`** — the tag this repo's `Dockerfile` actually
-  produces. This is the one remaining piece of drift: `PHPBB_EXTENSION` (already
+  produces (moving the kustomization `images:` match key together with it). This is the one remaining piece of drift: `PHPBB_EXTENSION` (already
   `hugmesh/forumapi`) and the injected `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` env vars
   are already correct (generator #437).
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
