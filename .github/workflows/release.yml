@@ -8,7 +8,7 @@ on:
   workflow_dispatch: {}
 
 env:
-  IMAGE: ghcr.io/hugmesh-net/hugmesh-forum-api
+  IMAGE: ghcr.io/hugmesh/hugmesh-forum-api
 
 jobs:
   lint-and-test:
