@@ -92,8 +92,12 @@ BanRequest      { reason:string? }
 1. The JWT is extracted from `Authorization: Bearer` and/or `X-HugMesh-JWT`. When
    both are present they must be the **same** token (no header-confusion downgrade).
 2. **RS256 signature** is verified against the Casdoor JWKS — fetched (and cached) from
-   the issuer's `jwks_uri` (`HUGMESH_JWKS_URI`), using `firebase/php-jwt`. On a `kid`
-   miss the key set is refreshed once (rotation) before failing closed.
+   the issuer's `jwks_uri` (`HUGMESH_JWKS_URI`), using `firebase/php-jwt`. The URI MUST
+   be `https://`. Only the key set's RS256 keys are kept. The cached set lives one hour
+   (`jwks_provider::CACHE_TTL`). On a signature or key-lookup failure the key set is
+   refreshed once (rotation) before failing closed. A dev-only knob,
+   `HUGMESH_JWKS_ALLOW_INSECURE_HTTP=1`, permits a plain `http://` JWKS URI (the compose
+   lane only; never set it in a cluster; it never relaxes an `https://` URI).
 3. `exp` / `nbf` are enforced by `firebase/php-jwt`. `iss` is verified here against
    `HUGMESH_JWT_ISSUER`, which is **required** — if it is unset, every token is
    rejected with `401` (fail-closed; we never fall open and skip the issuer check). `aud`
@@ -110,7 +114,9 @@ BanRequest      { reason:string? }
 5. **Per-route authorization** (fail-closed): reads = any authenticated user; writes =
    `ROLE_USER`+ (edit/delete enforce post ownership unless MOD/ADMIN); moderation =
    `ROLE_MOD`+; `/admin/**`, `ensure`, group-sync = `ROLE_ADMIN`. Status codes: 401
-   (no/invalid token), 403 (wrong role/ownership), 404 (missing), 400 (bad body).
+   (no/invalid token), 403 (wrong role/ownership), 404 (missing), 400 (bad body), 500
+   (any other error, with a generic message). Errors are JSON:
+   `{error:true,status,message}`.
 
 > **One deliberate exception:** `GET /health` is **unauthenticated** — a Kubernetes
 > liveness/readiness probe carries no JWT. It returns a static `{status,service}` literal
@@ -121,6 +127,14 @@ BanRequest      { reason:string? }
 
 Config is read from env first, then the phpBB config table, then a default — **no
 secret is committed**. See `.env.example`.
+
+| Env var | Config-table key | Default |
+|---|---|---|
+| `HUGMESH_JWKS_URI` (required) | `hugmesh_forumapi_jwks_uri` | none |
+| `HUGMESH_JWT_ISSUER` (required) | `hugmesh_forumapi_issuer` | none (all tokens rejected) |
+| `HUGMESH_JWT_AUDIENCE` | `hugmesh_forumapi_audience` | empty (no audience check) |
+| `HUGMESH_JWT_LEEWAY` | `hugmesh_forumapi_leeway` | `30` seconds |
+| `HUGMESH_DEFAULT_FORUM_ID` | `hugmesh_forumapi_default_forum_id` | `2` (used when `CreateTopic.categoryId` is 0 or absent) |
 
 ---
 
@@ -136,11 +150,20 @@ secret is committed**. See `.env.example`.
   call and restores it afterwards (`posting_service::as_user()`).
 - **Moderation** (`hide`/`delete`) uses the `content.visibility` service
   (`set_post_visibility` / `set_topic_visibility` with `ITEM_DELETED` / `ITEM_APPROVED`);
-  `lock` toggles `topic_status`.
+  `lock` sets `topic_status` to locked (there is no unlock action). `hide` and `delete`
+  do the same thing: both soft-delete the topic.
 - **Group sync** (`PUT /users/{sub}/groups`) is a **declarative converge**: the user ends
   up in exactly the target managed group (`ADMINISTRATORS` / `GLOBAL_MODERATORS` /
-  `REGISTERED`) derived from `roles[]`/`group`, and is removed from the other managed
-  groups (`group_user_add` / `group_user_del`). Non-managed memberships are untouched.
+  `REGISTERED`) and is removed from the other managed groups (`group_user_add` /
+  `group_user_del`). Non-managed memberships are untouched. A valid `group` in the body
+  (`ADMINISTRATORS`, `GLOBAL_MODERATORS`, `REGISTERED` or `NONE`) wins. Otherwise the
+  target comes from `roles[]`: `ADMIN` gives `ADMINISTRATORS`; `MOD` with `FORUM` gives
+  `GLOBAL_MODERATORS`; `FORUM` alone gives `REGISTERED`; anything else gives `NONE`.
+  `REGISTERED` membership is never removed.
+- **Bans** (`POST`/`DELETE /admin/users/{sub}/ban`): the sub must already be mapped (404
+  otherwise). A ban upserts `phpbb_banlist`, changes `user_type`, drops non-`REGISTERED`
+  groups and kills the user's sessions. An unban removes the entry, restores
+  `user_type = 0`, ensures `REGISTERED` and kills stale sessions.
 - **Reads** query phpBB tables via the injected DBAL connection and map to the DTOs;
   stats are `COUNT` queries (`source = "live"`).
 - **Sticker tokens**: `:snap-sticker:<slug>:` in stored post text is rendered server-side
@@ -156,22 +179,25 @@ secret is committed**. See `.env.example`.
 
 ### Baked image (deployment)
 
-The `Dockerfile` produces the image the deployment logically references as
-`hugmesh-systems/phpbb:dev`: official phpBB 3.3 on `php:8.1-apache`, this extension at
-`ext/hugmesh/forumapi/`, `composer install` for `firebase/php-jwt`, and an entrypoint
-that enables the extension via `phpbbcli` on first boot.
+The `Dockerfile` builds the phpBB image: official phpBB 3.3 (`PHPBB_VERSION`, default
+3.3.11) on `php:8.1-apache`, this extension at `ext/hugmesh/forumapi/`, `composer install`
+for `firebase/php-jwt`, and an entrypoint that regenerates `config.php` from env on every
+boot and enables the extension via `phpbbcli` (idempotent). `docker-compose.yml` tags it
+`hugmesh-systems/phpbb:dev`.
 
-**Cross-repo drift (as of this writing):** the cluster manifests
-(`hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml`, namespace
-`hugmesh-forum`) have mostly caught up with this repo's rename (generator #437):
-`PHPBB_EXTENSION` is already `hugmesh/forumapi` and the injected auth env vars are
-already `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER`, matching what this extension actually
-reads (see Auth above). The one piece still stale is the baked image reference itself —
-both the `bootstrap` initContainer and the main `phpbb` container still pull
-`hugmesh/phpbb:dev`, not the `hugmesh-systems/phpbb:dev` tag this repo's
-`Dockerfile` actually produces. See **Generator follow-ups** below. The manifests
-correctly point the forum-bff WebClient at
-`http://phpbb.hugmesh-forum.svc.cluster.local:80`.
+**How the cluster finds the image.** The manifest
+`hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml` (namespace `hugmesh-forum`)
+names the image with the placeholder `hugmesh/phpbb:dev` in both the `bootstrap`
+initContainer and the `phpbb` container. The kustomization next to it
+(`images:`) rewrites that to `registry.hugmesh.net/hugmesh/hugmesh-phpbb:main`, pulled with
+the `harbor-registry` secret. The manifest already sets `PHPBB_EXTENSION=hugmesh/forumapi`,
+`HUGMESH_JWKS_URI` and `HUGMESH_JWT_ISSUER`, runs `runAsNonRoot` as UID 33 with
+`capabilities.drop: ["ALL"]`, and probes `/api/v1/hugmesh/health`. The Service maps port
+80 to the named container port 8080.
+
+This repo does not push to Harbor. `.gitlab-ci.yml` pushes `$CI_REGISTRY_IMAGE:<tag>` and
+`:dev` to the GitLab registry. The manual-only `.github/workflows/release.yml` pushes
+`ghcr.io/hugmesh/hugmesh-forum-api:<sha>` and `:dev`.
 
 ### Manual (existing phpBB 3.3)
 
@@ -185,15 +211,18 @@ php bin/phpbbcli.php extension:enable hugmesh/forumapi
 # set HUGMESH_JWKS_URI / HUGMESH_JWT_ISSUER in the web server environment
 ```
 
+With `mod_php`, Apache strips the `Authorization` header. Set `CGIPassAuth On` for the
+document root (the `Dockerfile` does). Without it only `X-HugMesh-JWT` arrives and the
+dual-header agreement check is silently off.
+
 ---
 
-## How the forum-bff flips `phpbb.enabled=true`
+## How the forum-bff turns this on
 
 The forum-bff `PhpbbApiClient` / `PhpbbWebClientConfig` are gated by `phpbb.enabled`
-(env `PHPBB_ENABLED`, default `false`). While off, every extension call returns a typed
-degraded/empty result (the client maps writes to 202-pending) and the forum boots clean
-against a stub. Once this extension is validated on-cluster, flipping it on is
-**config-only**:
+(env `PHPBB_ENABLED`, default `false` in `application.yml`). While off, every extension
+call returns a typed degraded/empty result (the client maps writes to 202-pending) and
+the forum boots clean against a stub. Turning it on is **config-only**:
 
 ```yaml
 # forum-bff env
@@ -201,7 +230,11 @@ PHPBB_ENABLED: "true"
 PHPBB_API_BASE_URL: "http://phpbb.hugmesh-forum.svc.cluster.local:80"
 ```
 
-The client then forwards the user's Casdoor JWT (Bearer + `X-HugMesh-JWT`) on every
+`PHPBB_API_BASE_URL` already defaults to that value. The generator's
+`specs/cluster/manifests/forum-bff-api/deployment.yaml` sets `PHPBB_ENABLED: "true"` (and
+`EXTERNAL_FORUM_ENABLED: "true"`).
+
+The client forwards the user's Casdoor JWT (Bearer + `X-HugMesh-JWT`) on every
 call; this extension validates it and re-derives authority. On success it returns real
 bodies (and real 4xx/5xx on failure).
 
@@ -213,14 +246,16 @@ bodies (and real 4xx/5xx on failure).
 composer install
 composer validate --no-check-publish
 find . -path ./vendor -prune -o -name '*.php' -print | xargs -n1 php -l   # php -l everything
-vendor/bin/phpunit                                                        # JWT auth unit suite
+vendor/bin/phpunit                                                        # unit suite (tests/*_test.php)
 ```
 
-The **unit suite needs no live phpBB** — it exercises the JWT/JWKS auth chain
-(`tests/jwt_verifier_test.php`): valid token accepted; bad-signature / expired /
-wrong-issuer / wrong-audience rejected; authority re-derived from `roles`/`permissions`/
-`isAdmin`; reserved-prefix injection dropped; body-supplied `authorSubject` ignored;
-dual-header agreement; ownership/role gates.
+The **unit suite needs no live phpBB**. It has ten files in `tests/`. The JWT/JWKS auth
+chain (`tests/jwt_verifier_test.php`) covers: valid token accepted; bad-signature /
+expired / wrong-issuer / wrong-audience rejected; authority re-derived from
+`roles`/`permissions`/`isAdmin`; reserved-prefix injection dropped; body-supplied
+`authorSubject` ignored; dual-header agreement; ownership/role gates. The other files
+cover the controller error envelope, `/health`, the `as_user()` identity restore, group
+convergence, ban/unban, and sticker-token rendering.
 
 **Live phpBB smoke test** (the part unit tests cannot cover — real `submit_post()` /
 `content_visibility` / `user_add` against a real schema). The harness is
@@ -242,8 +277,9 @@ curl -i http://localhost:8080/index.php                                 # 403 (l
 ```
 
 CI is GitLab (`.gitlab-ci.yml`): `php -l` → `composer validate` → `phpunit` → **`build:image`**
-(bakes + pushes the custom phpBB image; default branch / tags only, from the privileged x86
-runner). (No GitHub Actions — this org uses GitLab CI.)
+(bakes + pushes the custom phpBB image; default branch / tags only, from the runner tagged
+`hugmesh-x86, privileged`). The only GitHub workflow is `.github/workflows/release.yml`.
+It is `workflow_dispatch` only, runs the same three checks and pushes the image to GHCR.
 
 ---
 
@@ -273,14 +309,14 @@ includes the pgsql driver. The remaining live-prove gap is end-to-end authed HTT
 on the cluster-shaped pgsql harness; this is a kubeadm/generator follow-up, not an
 extension bug.
 
-**Generator follow-ups for true on-cluster go-live:**
+**Generator state:**
 
-- `specs/cluster/manifests/forum/phpbb.yaml` (both the `bootstrap` initContainer and the
-  main `phpbb` container) must be repointed from the image tag `hugmesh/phpbb:dev`
-  to **`hugmesh-systems/phpbb:dev`** — the tag this repo's `Dockerfile` actually
-  produces (moving the kustomization `images:` match key together with it). This is the one remaining piece of drift: `PHPBB_EXTENSION` (already
-  `hugmesh/forumapi`) and the injected `HUGMESH_JWKS_URI` / `HUGMESH_JWT_ISSUER` env vars
-  are already correct (generator #437).
+- The image name is not drift. `phpbb.yaml` uses the placeholder `hugmesh/phpbb:dev` on
+  purpose and the kustomization `images:` entry rewrites it (see Install). Nothing needs
+  repointing to `hugmesh-systems/phpbb:dev`. What this repo does not show is which job
+  pushes `registry.hugmesh.net/hugmesh/hugmesh-phpbb:main`.
+- `PHPBB_EXTENSION`, `HUGMESH_JWKS_URI` and `HUGMESH_JWT_ISSUER` are already correct in
+  `phpbb.yaml`. `PHPBB_ENABLED` is already `"true"` in the forum-bff deployment.
 - Keep the board locked down via the image-level Apache lockdown / NetworkPolicy, not the
   board-disable flag.
 - The pod `securityContext` (`runAsNonRoot` + `drop: ["ALL"]`) is **resolved**: Apache now
@@ -289,8 +325,7 @@ extension bug.
   Service maps port 80 → targetPort 8080.
 
 This extension is the previously-"unbuilt external contract" the forum-bff
-(`hugmesh-forum-bff-api`) `PhpbbApiClient` was written against — now built. Flipping
-`phpbb.enabled=true` on the forum-bff is config-only once the image is on-cluster (see above).
+(`hugmesh-forum-bff-api`) `PhpbbApiClient` was written against — now built.
 
 ---
 
