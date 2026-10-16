@@ -149,10 +149,10 @@ committed.** See `.env.example`.
   (`set_post_visibility` / `set_topic_visibility` with `ITEM_DELETED` / `ITEM_APPROVED`).
   `lock` sets `topic_status` to locked. There is no unlock action. `hide` and `delete` do
   the same thing: both soft-delete the topic.
-- **Group sync** (`PUT /users/{sub}/groups`) is a **declarative converge**. The user ends
-  up in exactly one target managed group (`ADMINISTRATORS` / `GLOBAL_MODERATORS` /
-  `REGISTERED`) and leaves the other managed groups (`group_user_add` /
-  `group_user_del`). Other memberships are untouched. A valid `group` in the body
+- **Group sync** (`PUT /users/{sub}/groups`) is a **declarative converge**. The managed
+  groups are `ADMINISTRATORS` and `GLOBAL_MODERATORS`: the user is added to the target one
+  (if any) and removed from the other (`group_user_add` / `group_user_del`), and is always
+  (re)added to `REGISTERED`. Other memberships are untouched. A valid `group` in the body
   (`ADMINISTRATORS`, `GLOBAL_MODERATORS`, `REGISTERED` or `NONE`) wins. Otherwise the
   target comes from `roles[]`: `ADMIN` gives `ADMINISTRATORS`; `MOD` with `FORUM` gives
   `GLOBAL_MODERATORS`; `FORUM` alone gives `REGISTERED`; anything else gives `NONE`.
@@ -246,13 +246,14 @@ find . -path ./vendor -prune -o -name '*.php' -print | xargs -n1 php -l   # php 
 vendor/bin/phpunit                                                        # unit suite (tests/*_test.php)
 ```
 
-The **unit suite needs no live phpBB**. It has ten files in `tests/`. The JWT/JWKS auth
+The **unit suite needs no live phpBB**. It has eight test files in `tests/` (plus a
+bootstrap and the RSA test keys). The JWT/JWKS auth
 chain (`tests/jwt_verifier_test.php`) is covered for: valid token accepted;
 bad-signature / expired / wrong-issuer / wrong-audience rejected; authority re-derived
 from `roles`/`permissions`/`isAdmin`; reserved-prefix injection dropped; body-supplied
 `authorSubject` ignored; dual-header agreement; ownership and role gates. The other files
 cover the controller error envelope, `/health`, the `as_user()` identity restore, group
-convergence, ban/unban, and sticker-token rendering.
+convergence, ban/unban, sticker-token rendering, and the s9e text-formatter hook.
 
 **Live phpBB smoke test.** Unit tests cannot cover real `submit_post()` /
 `content_visibility` / `user_add` against a real schema. This harness does. It is
