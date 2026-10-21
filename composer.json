@@ -1,7 +1,7 @@
 {
     "name": "hugmesh/forumapi",
     "type": "phpbb-extension",
-    "version": "1.0.0",
+    "version": "0.2.0-beta.1",
     "description": "phpBB 3.3 headless Forum API extension (hugmesh/forum-api) — the forum-bff backend. Registers /api/v1/hugmesh/** routes that validate the Casdoor JWT, re-derive authority server-side, and act-as-user through phpBB's own submit_post / content_visibility / group services.",
     "homepage": "https://github.com/HugMesh/hugmesh-forum-api",
     "time": "2026-06-22",
