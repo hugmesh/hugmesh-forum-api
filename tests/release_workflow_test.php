@@ -7,8 +7,11 @@
  * publish workflow honest:
  *   - composer.json carries a beta version (MAJOR.MINOR.PATCH-beta.N), the image version;
  *   - release.yml has no pull_request / pull_request_target trigger;
- *   - every job uses the one runs-on line that reads RUNS_ON_PUBLISH only for main and
- *     v* tag refs and falls back to hosted ubuntu-latest;
+ *   - version, lint-and-test and github-release use the one runs-on line that reads
+ *     RUNS_ON_PUBLISH only for main and v* tag refs and falls back to hosted ubuntu-latest;
+ *   - the image job (build, push, sign) and notify-site run on literal ubuntu-latest, never
+ *     on a self-hosted runner; the image job signs its pushed DIGEST with cosign keyless and
+ *     pushes provenance and SBOM attestations, and only it holds id-token / attestations;
  *   - no image is ever tagged :latest.
  *
  * Cutting a final (non-beta) release is a deliberate decision: change the version test
@@ -66,14 +69,94 @@ class release_workflow_test extends TestCase
         $this->assertMatchesRegularExpression("/^\\s+tags: \\['v\\*'\\]$/m", $wf);
     }
 
+    /** @return array<string, string> job name => the job's lines (comments included) */
+    private function jobs(): array
+    {
+        $jobs = [];
+        $current = null;
+        $inside = false;
+        foreach (explode("\n", $this->workflow()) as $line)
+        {
+            if (preg_match('/^jobs:\s*$/', $line))
+            {
+                $inside = true;
+                continue;
+            }
+            if (!$inside)
+            {
+                continue;
+            }
+            if (preg_match('/^  ([A-Za-z0-9_-]+):\s*$/', $line, $m))
+            {
+                $current = $m[1];
+                $jobs[$current] = '';
+                continue;
+            }
+            if ($current !== null)
+            {
+                $jobs[$current] .= $line . "\n";
+            }
+        }
+        return $jobs;
+    }
+
     public function test_every_job_uses_the_guarded_runs_on_line(): void
     {
         $lines = preg_grep('/^\s*runs-on:/', explode("\n", $this->workflow()));
-        $this->assertCount(4, $lines, 'expected one runs-on line per job (version, lint-and-test, image, github-release)');
-        foreach ($lines as $line)
+        $this->assertCount(5, $lines, 'expected one runs-on line per job (version, lint-and-test, image, github-release, notify-site)');
+        $jobs = $this->jobs();
+        $this->assertSame(['version', 'lint-and-test', 'image', 'github-release', 'notify-site'], array_keys($jobs));
+        $hosted = ['image' => true, 'notify-site' => true];
+        foreach ($jobs as $name => $body)
         {
-            $this->assertSame(self::RUNS_ON, trim($line));
+            $runs = array_values(array_map('trim', preg_grep('/^    runs-on:/', explode("\n", $body))));
+            // The signed publish job and notify-site never use the self-hosted runner.
+            $want = isset($hosted[$name]) ? 'runs-on: ubuntu-latest' : self::RUNS_ON;
+            $this->assertSame([$want], $runs, "job {$name} runs-on line");
         }
+    }
+
+    public function test_image_job_signs_and_attests_the_pushed_digest(): void
+    {
+        $jobs = $this->jobs();
+        $image = preg_replace('/^\s*#.*$/m', '', $jobs['image'] ?? '');
+        $this->assertMatchesRegularExpression(
+            '/^    permissions:\n      contents: read\n      packages: write\n      id-token: write\n      attestations: write\n    [a-z]/m',
+            $image,
+            'image job permissions are exactly contents read, packages/id-token/attestations write'
+        );
+        foreach ($jobs as $name => $body)
+        {
+            if ($name !== 'image')
+            {
+                $this->assertDoesNotMatchRegularExpression('/^\s+(id-token|attestations):/m', $body, "{$name} must not hold id-token or attestations");
+            }
+        }
+        $build = strpos($image, 'id: build');
+        $signref = strpos($image, 'id: signref');
+        $this->assertNotFalse($build);
+        $this->assertNotFalse($signref);
+        $this->assertLessThan($signref, $build, 'the digest is resolved after the build step');
+        $after = substr($image, $signref);
+        $this->assertStringContainsString('DIGEST: ${{ steps.build.outputs.digest }}', $image);
+        $this->assertStringContainsString('sha256:[0-9a-f]{64}', $after);
+        $this->assertStringContainsString('"latest" in tags', $after);
+        $this->assertStringContainsString('run: cosign sign --yes "$REF"', $after);
+        $this->assertStringContainsString('REF: ${{ steps.signref.outputs.repo }}@${{ steps.signref.outputs.digest }}', $after);
+        $this->assertStringContainsString('uses: actions/attest-build-provenance@', $after);
+        $this->assertStringContainsString('uses: actions/attest-sbom@', $after);
+        $this->assertSame(2, substr_count($after, 'subject-digest: ${{ steps.signref.outputs.digest }}'));
+        $this->assertSame(2, substr_count($after, 'push-to-registry: true'));
+        $this->assertStringNotContainsString('push-to-registry: false', $after);
+    }
+
+    public function test_notify_site_has_no_permissions_and_runs_only_for_v_tags(): void
+    {
+        $note = preg_replace('/^\s*#.*$/m', '', $this->jobs()['notify-site'] ?? '');
+        $this->assertMatchesRegularExpression('/^    permissions: \{\}$/m', $note);
+        $this->assertDoesNotMatchRegularExpression('/^    permissions:\s*$/m', $note);
+        $this->assertStringContainsString("if: startsWith(github.ref, 'refs/tags/v')", $note);
+        $this->assertStringContainsString('needs: [github-release]', $note);
     }
 
     public function test_no_image_is_tagged_latest(): void
