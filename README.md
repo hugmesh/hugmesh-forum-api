@@ -193,8 +193,8 @@ it rewrites that to `registry.hugmesh.net/hugmesh/hugmesh-phpbb:main`, pulled wi
 80 to the named container port 8080.
 
 This repo does not push to Harbor. `.gitlab-ci.yml` pushes `$CI_REGISTRY_IMAGE:<tag>` and
-`:dev` to the GitLab registry. The manual-only `.github/workflows/release.yml` pushes
-`ghcr.io/hugmesh/hugmesh-forum-api:<sha>` and `:dev`.
+`:dev` to the GitLab registry. `.github/workflows/release.yml` pushes
+`ghcr.io/hugmesh/hugmesh-forum-api` (see "Versions and releases" below).
 
 ### Manual (existing phpBB 3.3)
 
@@ -246,7 +246,7 @@ find . -path ./vendor -prune -o -name '*.php' -print | xargs -n1 php -l   # php 
 vendor/bin/phpunit                                                        # unit suite (tests/*_test.php)
 ```
 
-The **unit suite needs no live phpBB**. It has eight test files in `tests/` (plus a
+The **unit suite needs no live phpBB**. It has nine test files in `tests/` (plus a
 bootstrap and the RSA test keys). The JWT/JWKS auth
 chain (`tests/jwt_verifier_test.php`) is covered for: valid token accepted;
 bad-signature / expired / wrong-issuer / wrong-audience rejected; authority re-derived
@@ -254,6 +254,9 @@ from `roles`/`permissions`/`isAdmin`; reserved-prefix injection dropped; body-su
 `authorSubject` ignored; dual-header agreement; ownership and role gates. The other files
 cover the controller error envelope, `/health`, the `as_user()` identity restore, group
 convergence, ban/unban, sticker-token rendering, and the s9e text-formatter hook.
+`tests/release_workflow_test.php` guards the release setup: the beta version in
+`composer.json`, no pull-request trigger in `release.yml`, one guarded `runs-on` line per
+job, and no `:latest` tag.
 
 **Live phpBB smoke test.** Unit tests cannot cover real `submit_post()` /
 `content_visibility` / `user_add` against a real schema. This harness does. It is
@@ -277,8 +280,40 @@ curl -i http://localhost:8080/index.php                                 # 403 (l
 CI is GitLab (`.gitlab-ci.yml`): `php -l` → `composer validate` → `phpunit` →
 **`build:image`**. `build:image` bakes and pushes the custom phpBB image, on the default
 branch and tags only, from the runner tagged `hugmesh-x86, privileged`. The only GitHub
-workflow is `.github/workflows/release.yml`. It runs on `workflow_dispatch` only, runs the
-same three checks, and pushes the image to GHCR.
+workflow is `.github/workflows/release.yml`. It runs the same three checks in the same
+`php:8.1-cli` image, then pushes the image to GHCR.
+
+### Versions and releases
+
+The version is `composer.json` `"version"`, in the form `MAJOR.MINOR.PATCH-beta.N`. It is
+`0.2.0-beta.1` today: built and tested (see "Go-live status" for the compose smoke runs),
+never published, and not yet shown running in the default mesh. (It was `1.0.0` before; nothing was ever published under that
+number.) A new beta of the same base raises `N`.
+
+`release.yml` runs on:
+
+| Event | Image tags pushed | GitHub Release |
+|---|---|---|
+| push to `main` | `:main`, `:sha-<12 hex>` | none |
+| push of tag `v<version>` | `:<version>`, `:sha-<12 hex>`, `:beta` | pre-release, not latest |
+| `workflow_dispatch` on `main` | same as a push to `main` | none |
+| `workflow_dispatch` on a `v*` tag | re-runs that release | created if missing |
+
+The version job refuses a tag that does not match `composer.json`, a tag that is not on
+`main`, a development version, and any other ref. A published version tag is never
+overwritten: a re-run of the same commit skips the push, anything else fails. A beta is
+never tagged `:latest`. To cut a beta, merge the version bump, then push an annotated tag
+on that `main` commit:
+
+```bash
+git tag -a v0.2.0-beta.1 -m "hugmesh-forum-api 0.2.0-beta.1"
+git push origin v0.2.0-beta.1
+```
+
+There is no pull-request trigger. Each job runs on the runner named by the repository
+variable `RUNS_ON_PUBLISH` (a JSON array such as `["self-hosted","Linux","X64"]`), but only
+for `main` and `v*` tag refs. Otherwise, or when that variable is unset, it runs on hosted
+`ubuntu-latest`. Deleting `RUNS_ON_PUBLISH` sends every job back to hosted runners.
 
 ---
 

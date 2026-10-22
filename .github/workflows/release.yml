@@ -1,57 +1,150 @@
 name: Release
 
-# Manual-only: this workflow is intentionally inert until a human enables it.
-# It is modeled on this repo's .gitlab-ci.yml (lint -> validate -> test -> build:image),
-# adapted to build+push the container image to GHCR instead of the in-cluster GitLab
-# registry.
+# Publishes the phpBB image with this extension baked in: ghcr.io/hugmesh/hugmesh-forum-api.
+#
+#   push to main                   -> :main and :sha-<12 hex>
+#   push of tag v<version>         -> :<version>, :sha-<12 hex>, :beta (pre-releases only),
+#                                     and a GitHub Release marked pre-release, not latest
+#   workflow_dispatch on main      -> same as a push to main
+#   workflow_dispatch on a v* tag  -> re-runs that release (never overwrites a published tag)
+#   anything else                  -> refused by the version job
+#
+# The version comes from composer.json "version". A v* tag must match it exactly.
+# A beta never gets :latest.
+#
+# Runner rule: there is NO pull_request trigger here, ever. The runs-on line below sends a
+# job to the runner named by the RUNS_ON_PUBLISH variable (a JSON array, for example
+# ["self-hosted","Linux","X64"]) only for main and v* tag refs and never for a PR event.
+# In every other case, and when RUNS_ON_PUBLISH is unset, the job runs on hosted
+# ubuntu-latest. Deleting RUNS_ON_PUBLISH sends every job back to hosted runners.
 on:
+  push:
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   IMAGE: ghcr.io/hugmesh/hugmesh-forum-api
 
 jobs:
+  version:
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      kind: ${{ steps.resolve.outputs.kind }}
+      sha12: ${{ steps.resolve.outputs.sha12 }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the version and what kind of run this is
+        id: resolve
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess, sys
+
+          def die(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
+
+          with open("composer.json", encoding="utf-8") as fh:
+              version = json.load(fh).get("version", "")
+          ref = os.environ["GITHUB_REF"]
+          event = os.environ["GITHUB_EVENT_NAME"]
+          sha = os.environ["GITHUB_SHA"]
+
+          if not re.fullmatch(r"\d+\.\d+\.\d+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?", version):
+              die(f"composer.json version {version!r} is not MAJOR.MINOR.PATCH[-pre] (no +build part)")
+          if re.search(r"snapshot|dev", version, re.IGNORECASE):
+              die(f"composer.json version {version!r} is a development version; it is never published")
+          if event in ("pull_request", "pull_request_target"):
+              die("this workflow never publishes from a pull request event")
+
+          if ref == "refs/heads/main":
+              kind = "main"
+          elif ref.startswith("refs/tags/v"):
+              tag_version = ref[len("refs/tags/v"):]
+              if tag_version != version:
+                  die(f"tag v{tag_version} does not match composer.json version {version}")
+              subprocess.run(["git", "fetch", "-q", "origin", "main"], check=True)
+              if subprocess.run(["git", "merge-base", "--is-ancestor", sha, "FETCH_HEAD"]).returncode != 0:
+                  die(f"tag v{tag_version} points at {sha}, which is not on main")
+              kind = "release"
+          else:
+              die(f"{ref} is neither refs/heads/main nor a refs/tags/v* tag; nothing to publish")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"version={version}\n")
+              out.write(f"kind={kind}\n")
+              out.write(f"sha12={sha[:12]}\n")
+              out.write(f"prerelease={'true' if '-' in version else 'false'}\n")
+          print(f"version={version} kind={kind} sha12={sha[:12]}")
+          PY
+
   lint-and-test:
-    runs-on: ubuntu-latest
+    # The same gate as .gitlab-ci.yml (php -l -> composer validate -> phpunit), run in the
+    # same php:8.1-cli image so it behaves the same on hosted and self-hosted runners
+    # (the self-hosted host has no PHP, and setup-php does not support it).
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.1"
-          extensions: zip, pgsql, mysqli, gd
-          coverage: none
-
-      - name: php -l (syntax check every file)
+      - name: php -l, composer validate, composer install, phpunit (php:8.1-cli)
         run: |
+          # The container runs as root; the EXIT trap hands every file it wrote back to the
+          # runner's user so a self-hosted runner can clean its workspace next time.
+          docker run --rm -i --network host \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e COMPOSER_ALLOW_SUPERUSER=1 \
+            -v "$GITHUB_WORKSPACE:/app" -w /app \
+            php:8.1-cli bash -euo pipefail -s <<'GATE'
+          trap 'chown -R "$HOST_UID:$HOST_GID" /app' EXIT
+          apt-get update -qq
+          apt-get install -y -qq git unzip libzip-dev > /dev/null
+          docker-php-ext-install zip > /dev/null 2>&1 || true
+          curl -sS https://getcomposer.org/installer | php -- --2 --install-dir=/usr/local/bin --filename=composer
+          git config --global --add safe.directory /app
+
+          echo "php -l on every .php file"
           fail=0
           while IFS= read -r f; do
             if ! php -l "$f" > /dev/null; then
               echo "SYNTAX ERROR: $f"
-              php -l "$f"
+              php -l "$f" || true
               fail=1
             fi
           done < <(find . -path ./vendor -prune -o -name '*.php' -print)
-          exit $fail
+          [ "$fail" -eq 0 ]
 
-      - name: composer validate
-        run: composer validate --no-check-publish
+          composer validate --no-check-publish
+          composer install --no-interaction --prefer-dist
+          vendor/bin/phpunit --colors=never
+          GATE
 
-      - name: composer install
-        run: composer install --no-interaction --prefer-dist
-
-      - name: phpunit
-        run: vendor/bin/phpunit --colors=never
-
-  build-image:
-    needs: lint-and-test
-    runs-on: ubuntu-latest
+  image:
+    needs: [version, lint-and-test]
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
     permissions:
       contents: read
       packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      KIND: ${{ needs.version.outputs.kind }}
+      SHA12: ${{ needs.version.outputs.sha12 }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -60,12 +153,79 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Choose the image tags (a published version tag is never overwritten)
+        id: tags
+        run: |
+          push=true
+          if [ "$KIND" = release ]; then
+            if out=$(docker buildx imagetools inspect "$IMAGE:$VERSION" 2>&1); then
+              # Already published. A re-run on the same commit skips the push; anything
+              # else is refused, because a published version must never change.
+              published=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{.Manifest.Digest}}')
+              this_commit=$(docker buildx imagetools inspect "$IMAGE:sha-$SHA12" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+              if [ -n "$this_commit" ] && [ "$published" = "$this_commit" ]; then
+                echo "::notice::$IMAGE:$VERSION is already published from this commit; not pushing it again"
+                push=false
+              else
+                echo "::error::$IMAGE:$VERSION is already published from a different build; raise the -beta.N number instead"
+                exit 1
+              fi
+            elif ! printf '%s' "$out" | grep -a -i 'not found' > /dev/null; then
+              echo "::error::could not check whether $IMAGE:$VERSION exists: $out (if the package does not exist yet, let a main run create it first)"
+              exit 1
+            fi
+            {
+              echo 'list<<EOF'
+              echo "$IMAGE:$VERSION"
+              echo "$IMAGE:sha-$SHA12"
+              if [ "$PRERELEASE" = true ]; then echo "$IMAGE:beta"; fi
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+            echo "label_version=$VERSION" >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo 'list<<EOF'
+              echo "$IMAGE:main"
+              echo "$IMAGE:sha-$SHA12"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+            echo "label_version=main" >> "$GITHUB_OUTPUT"
+          fi
+          echo "push=$push" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
+        if: steps.tags.outputs.push == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           pull: true
-          tags: |
-            ${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.IMAGE }}:dev
+          tags: ${{ steps.tags.outputs.list }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.label_version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  github-release:
+    needs: [version, image]
+    if: needs.version.outputs.kind == 'release'
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+    steps:
+      - name: Create the GitHub Release (pre-release and never latest for a beta)
+        run: |
+          if gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::notice::release $GITHUB_REF_NAME already exists; leaving it as it is"
+            exit 0
+          fi
+          if [ "$PRERELEASE" = true ]; then
+            flags=(--prerelease --latest=false)
+          else
+            flags=(--latest)
+          fi
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}"
