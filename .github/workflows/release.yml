@@ -12,8 +12,10 @@ name: Release
 # The version comes from composer.json "version". A v* tag must match it exactly.
 # A beta never gets :latest.
 #
-# Runner rule: there is NO pull_request trigger here, ever. The runs-on line below sends a
-# job to the runner named by the RUNS_ON_PUBLISH variable (a JSON array, for example
+# Runner rule: there is NO pull_request trigger here, ever. The image job (build, push,
+# sign) and notify-site run on GitHub-hosted ubuntu-latest, written literally: a published,
+# signed image is never built on a self-hosted runner. For the other jobs the runs-on line
+# below sends a job to the runner named by the RUNS_ON_PUBLISH variable (a JSON array, for example
 # ["self-hosted","Linux","X64"]) only for main and v* tag refs and never for a PR event.
 # In every other case, and when RUNS_ON_PUBLISH is unset, the job runs on hosted
 # ubuntu-latest. Deleting RUNS_ON_PUBLISH sends every job back to hosted runners.
@@ -243,7 +245,7 @@ jobs:
           if len(repos) != 1:
               sys.exit(f"::error::expected one pushed repository, got {sorted(repos)}")
           if "latest" in tags:
-              sys.exit("::error::a :latest tag was pushed; beta images must never be tagged latest")
+              sys.exit("::error::a tag named latest was pushed; beta images must never be tagged latest")
           repo = repos.pop()
           if repo != repo.lower() or not repo.startswith("ghcr.io/hugmesh/"):
               sys.exit(f"::error::unexpected image repository {repo!r}")
