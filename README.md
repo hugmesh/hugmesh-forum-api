@@ -329,4 +329,4 @@ This extension is the once-"unbuilt external contract" that the forum-bff
 
 ## License
 
-GPL-2.0-only (phpBB extension convention).
+GPL-2.0-only (phpBB extension convention). The full text is in [`LICENSE`](LICENSE).
