@@ -1,21 +1,25 @@
 <?php
 /**
- * Guards for the beta version and the publish workflow (.github/workflows/release.yml).
+ * Guards for the version and the publish workflow (.github/workflows/release.yml).
  *
  * Once the repo is public, a job that asks for the self-hosted runner from a pull request
  * would run code from anyone's fork on the operator's machine. These tests keep the
  * publish workflow honest:
- *   - composer.json carries a beta version (MAJOR.MINOR.PATCH-beta.N), the image version;
+ *   - composer.json carries MAJOR.MINOR.PATCH (stable) or MAJOR.MINOR.PATCH-beta.N (beta),
+ *     the image version;
  *   - release.yml has no pull_request / pull_request_target trigger;
  *   - version, lint-and-test and github-release use the one runs-on line that reads
  *     RUNS_ON_PUBLISH only for main and v* tag refs and falls back to hosted ubuntu-latest;
  *   - the image job (build, push, sign) and notify-site run on literal ubuntu-latest, never
  *     on a self-hosted runner; the image job signs its pushed DIGEST with cosign keyless and
  *     pushes provenance and SBOM attestations, and only it holds id-token / attestations;
- *   - no image is ever tagged :latest.
+ *   - release.yml publishes from main, release/X.Y branches and v* tags, and takes the
+ *     release channel from scripts/release-channel.sh: its code never names the latest tag
+ *     itself, and the signref step refuses a pushed tag set the script did not compute.
  *
- * Cutting a final (non-beta) release is a deliberate decision: change the version test
- * below in the same pull request.
+ * The channel rules themselves (beta from main, stable from release/X.Y, which stable
+ * moves the X.Y and latest tags) are tested by scripts/test-release-channel.sh, which the
+ * release workflow's version job runs first.
  *
  * @copyright (c) 2026 HugMesh Systems
  * @license GNU General Public License, version 2 (GPL-2.0)
@@ -36,14 +40,14 @@ class release_workflow_test extends TestCase
         return (string) file_get_contents($path);
     }
 
-    public function test_composer_version_is_a_beta(): void
+    public function test_composer_version_is_stable_or_beta(): void
     {
         $composer = json_decode((string) file_get_contents(__DIR__ . '/../composer.json'), true);
         $this->assertIsArray($composer);
         $this->assertMatchesRegularExpression(
-            '/^\d+\.\d+\.\d+-beta\.[1-9]\d*$/',
+            '/^\d+\.\d+\.\d+(-beta\.[1-9]\d*)?$/',
             $composer['version'] ?? '',
-            'composer.json version must be MAJOR.MINOR.PATCH-beta.N (it is the image version)'
+            'composer.json version must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-beta.N (it is the image version)'
         );
     }
 
@@ -62,10 +66,10 @@ class release_workflow_test extends TestCase
         );
     }
 
-    public function test_release_workflow_publishes_on_main_and_v_tags(): void
+    public function test_release_workflow_publishes_on_main_release_branches_and_v_tags(): void
     {
         $wf = $this->workflow();
-        $this->assertMatchesRegularExpression('/^\s+branches: \[main\]$/m', $wf);
+        $this->assertMatchesRegularExpression("/^\\s+branches: \\[main, 'release\\/\\*\\*'\\]$/m", $wf);
         $this->assertMatchesRegularExpression("/^\\s+tags: \\['v\\*'\\]$/m", $wf);
     }
 
@@ -159,10 +163,20 @@ class release_workflow_test extends TestCase
         $this->assertStringContainsString('needs: [github-release]', $note);
     }
 
-    public function test_no_image_is_tagged_latest(): void
+    public function test_only_the_channel_script_tags_an_image_latest(): void
     {
-        // Full-line comments may name the tag to say it is never used; code may not.
+        // Full-line comments may name the tag; code may not: the latest tag (like :beta
+        // and :X.Y) comes only from scripts/release-channel.sh, run right before the push.
         $code = preg_replace('/^\s*#.*$/m', '', $this->workflow());
         $this->assertStringNotContainsString(':latest', $code);
+        $this->assertStringContainsString('bash scripts/test-release-channel.sh', $code);
+        $this->assertStringContainsString('VERSION_FILE=composer.json bash scripts/release-channel.sh', $code);
+        $this->assertFileExists(__DIR__ . '/../scripts/release-channel.sh');
+        $this->assertFileExists(__DIR__ . '/../scripts/test-release-channel.sh');
+        // The signref step refuses tags the script did not compute, and a latest tag on a
+        // beta (or with no VERSION at all) or on a stable that does not own it.
+        $this->assertStringContainsString('EXPECTED_TAGS: ${{ steps.meta.outputs.tags }}', $code);
+        $this->assertStringContainsString('if "latest" in tags and ("-" in (os.environ.get("VERSION") or "-") or os.environ.get("MOVE_LATEST") != "true"):', $code);
+        $this->assertStringNotContainsString('if "latest" in tags:', $code);
     }
 }
