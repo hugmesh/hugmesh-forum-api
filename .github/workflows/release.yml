@@ -21,7 +21,9 @@ name: Release
 #   workflow_dispatch on main, a release/X.Y branch or a v* tag
 #                                  -> same as the push; for a tag, an image
 #                                     already published from this commit is not
-#                                     pushed again, and a GitHub release that
+#                                     pushed again but IS signed, attested and
+#                                     checked again (a re-run repairs a run whose
+#                                     signing failed), and a GitHub release that
 #                                     already exists is left alone
 #   anything else                  -> refused by the version job (this includes
 #                                     release/<anything that is not X.Y>)
@@ -39,6 +41,14 @@ name: Release
 # line. A window of seconds remains between that check and the registry write
 # (a registry has no compare-and-swap); if a concurrent run wins it, the digest
 # check below fails that run.
+#
+# A GitHub release is only ever created by a run whose image job succeeded, and
+# the image job only succeeds once the digest every tag resolves to is signed
+# and attested: a run that skips the push (the version is already published
+# from this commit) signs that published digest instead of a fresh one, so
+# "Re-run failed jobs" after a Sigstore failure repairs the release rather than
+# going green around it. No step in the image job continues on error and
+# github-release never runs on a failed image job.
 #
 # Runner rule: there is NO pull_request trigger here, ever. The image job (build, push,
 # sign) and notify-site run on GitHub-hosted ubuntu-latest, written literally: a published,
@@ -186,7 +196,9 @@ jobs:
       # floating tags :beta, :X.Y and :latest are meant to move to a newer
       # release, so they are not. A re-run on the same commit (the published
       # :X.Y.Z is the very manifest this commit's :sha-<12> points at) skips the
-      # push; anything else is refused, because a published version must never
+      # push and hands the published digest (output `digest`) to the signref
+      # step, so the signing, the attestations and the tag check run against it;
+      # anything else is refused, because a published version must never
       # change. Only "not found" lets a first publish continue: any other
       # answer (auth, network) stops the run, so a failed lookup can never turn
       # into an overwrite.
@@ -211,8 +223,12 @@ jobs:
             published="$(docker buildx imagetools inspect "$ref" --raw | sha256sum)" || published=""
             this_commit="$(docker buildx imagetools inspect "$IMAGE_NAME:sha-$SHA12" --raw 2>/dev/null | sha256sum)" || this_commit=""
             if [ -n "$published" ] && [ "$published" = "$this_commit" ]; then
-              echo "::notice::$ref is already published from this commit; not pushing it again"
+              # sha256sum prints "<64 hex>  -"; the digest is sha256:<64 hex>
+              # (the signref step checks that shape before anything signs it).
+              published="${published%% *}"
+              echo "::notice::$ref is already published from this commit as sha256:$published; not pushing it again, signing and checking that digest instead"
               echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "digest=sha256:$published" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             case "$VERSION" in
@@ -248,13 +264,17 @@ jobs:
 
       - name: Compute tags and labels
         id: meta
-        if: steps.exists.outputs.skip != 'true'
         run: |
           set -euo pipefail
           # scripts/release-channel.sh decides the tag list here, right before
           # the push, not in the version job: beta -> X.Y.Z-beta.N + beta;
           # stable -> X.Y.Z plus X.Y and the latest tag when nothing newer is
           # published on its line / on any line; every run adds sha-<12>.
+          # This step pushes nothing, so it also runs when the push is skipped:
+          # the list it computes is then the set of tags that must resolve to
+          # the already published digest (the check after the signing). A
+          # newer stable published since the first attempt drops the latest
+          # tag / X.Y from the list, so they are not demanded of the old digest.
           out="$(VERSION_FILE=composer.json bash scripts/release-channel.sh)"
           echo "$out"
           tags="$(printf '%s\n' "$out" | sed -n '/^image_tags<<EOF_IMAGE_TAGS$/,/^EOF_IMAGE_TAGS$/p' | sed '1d;$d')"
@@ -300,51 +320,75 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       # --- signed-images-20261021 ---
-      # Everything below signs what the step `build` just pushed, by DIGEST, from
-      # this GitHub-hosted job: a cosign keyless signature (Sigstore, GitHub OIDC),
-      # a SLSA build-provenance attestation and an SPDX SBOM attestation, both
-      # pushed next to the image. A run that skipped the build (existing release
-      # tag) skips all of it.
+      # Everything below signs ONE digest, from this GitHub-hosted job: a cosign
+      # keyless signature (Sigstore, GitHub OIDC), a SLSA build-provenance
+      # attestation and an SPDX SBOM attestation, both pushed next to the image.
+      # Which digest: what the step `build` just pushed, or, when the push was
+      # skipped because :X.Y.Z is already published from this commit, that
+      # published digest (from the overwrite guard). So "Re-run failed jobs"
+      # after a cosign/attest failure signs the image the first attempt left
+      # unsigned, instead of skipping the signing and letting github-release
+      # vouch for an unsigned digest. Nothing below continues on error: a failed
+      # signature fails the job, and a failed image job creates no release.
+      # A skipped push that finds a computed tag pointing elsewhere (a beta
+      # whose :beta has moved on to a newer beta, or a floating tag the first
+      # attempt never got to write) fails the check at the end; that release is
+      # not repairable by a re-run and is cut again as the next version instead.
       - name: Resolve the pushed image name and digest
         id: signref
-        if: steps.build.outcome == 'success'
+        if: steps.build.outcome == 'success' || steps.exists.outputs.skip == 'true'
         env:
           METADATA: ${{ steps.build.outputs.metadata }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          SKIP: ${{ steps.exists.outputs.skip }}
+          PUBLISHED_DIGEST: ${{ steps.exists.outputs.digest }}
           EXPECTED_TAGS: ${{ steps.meta.outputs.tags }}
           MOVE_LATEST: ${{ steps.meta.outputs.move_latest }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json, os, re, sys
-          meta = json.loads(os.environ.get("METADATA") or "{}")
-          digest = os.environ.get("DIGEST", "")
-          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
-              sys.exit(f"::error::build step gave no usable digest: {digest!r}")
-          names = [n.strip() for n in meta.get("image.name", "").split(",") if n.strip()]
-          repos, tags = set(), []
-          for n in names:
-              head, _, last = n.rpartition("/")
-              if ":" in last:
-                  last, tag = last.split(":", 1)
-                  tags.append(tag)
-              repos.add(f"{head}/{last}")
-          if len(repos) != 1:
-              sys.exit(f"::error::expected one pushed repository, got {sorted(repos)}")
           expected = sorted(t.rpartition(":")[2] for t in os.environ.get("EXPECTED_TAGS", "").split() if t)
-          if sorted(tags) != expected:
-              sys.exit(f"::error::pushed tags {sorted(tags)} are not the computed tags {expected}")
+          if not expected:
+              sys.exit("::error::no computed tags; nothing to sign")
+          if os.environ.get("SKIP") == "true":
+              # The push was skipped: :X.Y.Z is already published from this commit.
+              # Sign and check that digest under the tags computed right now.
+              digest = os.environ.get("PUBLISHED_DIGEST", "")
+              if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                  sys.exit(f"::error::the overwrite guard gave no usable published digest: {digest!r}")
+              repo = os.environ.get("IMAGE_NAME", "")
+              tags = list(expected)
+              what = "re-signing the published"
+          else:
+              meta = json.loads(os.environ.get("METADATA") or "{}")
+              digest = os.environ.get("DIGEST", "")
+              if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                  sys.exit(f"::error::build step gave no usable digest: {digest!r}")
+              names = [n.strip() for n in meta.get("image.name", "").split(",") if n.strip()]
+              repos, tags = set(), []
+              for n in names:
+                  head, _, last = n.rpartition("/")
+                  if ":" in last:
+                      last, tag = last.split(":", 1)
+                      tags.append(tag)
+                  repos.add(f"{head}/{last}")
+              if len(repos) != 1:
+                  sys.exit(f"::error::expected one pushed repository, got {sorted(repos)}")
+              if sorted(tags) != expected:
+                  sys.exit(f"::error::pushed tags {sorted(tags)} are not the computed tags {expected}")
+              repo = repos.pop()
+              what = "signing"
           # The latest tag only for a stable version that owns it (MOVE_LATEST from the
           # check right before the push). The "-" fallback makes a missing or EMPTY VERSION fail
           # closed (a job output that was never set arrives as "", not unset).
           if "latest" in tags and ("-" in (os.environ.get("VERSION") or "-") or os.environ.get("MOVE_LATEST") != "true"):
               sys.exit("::error::a tag named latest was pushed; beta images and older-line patches must never be tagged latest")
-          repo = repos.pop()
           if repo != repo.lower() or not repo.startswith("ghcr.io/hugmesh/"):
               sys.exit(f"::error::unexpected image repository {repo!r}")
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"repo={repo}\ndigest={digest}\n")
-          print(f"signing {repo}@{digest} (tags: {', '.join(tags)})")
+          print(f"{what} {repo}@{digest} (tags: {', '.join(tags)})")
           PY
 
       - name: Install cosign
@@ -385,8 +429,9 @@ jobs:
           push-to-registry: true
 
       # cosign and the attestations bind to the digest, so they cover every tag
-      # that resolves to it. Prove each pushed tag does (a floating tag moved
-      # by a concurrent run would not).
+      # that resolves to it. Prove each computed tag does (a floating tag moved
+      # by a concurrent run would not; on a skipped push, a tag the first
+      # attempt never wrote would not either).
       - name: Check every pushed tag resolves to the signed digest
         if: steps.signref.outcome == 'success'
         env:
@@ -442,6 +487,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # This job needs a SUCCESSFUL image job (no always()/!cancelled() here,
+      # ever): the release vouches for an image, and the image job only
+      # succeeds once every tag resolves to a signed, attested digest.
+      #
       # beta -> prerelease, never Latest. stable -> a full release, marked
       # Latest only when nothing newer is published on any line (gh would
       # otherwise pick Latest by date and mislabel an older-line patch). That is

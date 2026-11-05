@@ -158,7 +158,23 @@ esac
 echo "stub gh: unexpected $*" >&2
 exit 2
 STUB
-chmod +x "$work/bin/curl" "$work/bin/docker" "$work/bin/gh"
+cat >"$work/bin/cosign" <<'STUB'
+#!/usr/bin/env bash
+# $reg/signed: every REF (repo@digest) that was signed. $reg/cosign-fail makes
+# Sigstore misbehave, as a Fulcio/Rekor outage does.
+echo "cosign $*" >>"$STUB_REG/calls"
+if [ "$1 $2" != "sign --yes" ]; then
+  echo "stub cosign: unexpected $*" >&2
+  exit 2
+fi
+if [ -e "$STUB_REG/cosign-fail" ]; then
+  echo "Error: signing [$3]: getting signer: getting key from Fulcio: retrieving cert: 502 Bad Gateway" >&2
+  exit 1
+fi
+echo "$3" >>"$STUB_REG/signed"
+STUB
+chmod +x "$work/bin/curl" "$work/bin/docker" "$work/bin/gh" "$work/bin/cosign"
+: >"$reg/signed"
 export STUB_REG="$reg"
 
 published() { # published VERSION...: the registry now has these images
@@ -567,6 +583,11 @@ expect_exists "a push to main checks nothing" 0 false ""
 
 run_step "$work/exists.sh" 0.4.1 refs/tags/v0.4.1 "$r41" SHA12="$(s12 "$r41")"
 expect_exists "an unpublished :X.Y.Z goes ahead" 0 false ""
+if grep -q '^digest=' "$work/gho"; then
+  bad "overwrite guard: a first publish must not hand a digest on: $(cat "$work/gho")"
+else
+  ok "overwrite guard: a first publish hands no digest on"
+fi
 
 printf '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","n":1}' >"$reg/manifests/0.4.1"
 cp "$reg/manifests/0.4.1" "$reg/manifests/sha-$(s12 "$r41")"
@@ -574,6 +595,12 @@ printf 'an older build' >"$reg/manifests/latest"
 printf 'an older build' >"$reg/manifests/0.4"
 run_step "$work/exists.sh" 0.4.1 refs/tags/v0.4.1 "$r41" SHA12="$(s12 "$r41")"
 expect_exists "a re-run from the same commit skips the push (floating tags are not checked)" 0 true "already published from this commit"
+published_hash="$(sha256sum "$reg/manifests/0.4.1")"
+if [ "$(sed -n 's/^digest=//p' "$work/gho")" = "sha256:${published_hash%% *}" ]; then
+  ok "overwrite guard: the skip hands the published :X.Y.Z digest on for signing"
+else
+  bad "overwrite guard: the skip gave digest=[$(sed -n 's/^digest=//p' "$work/gho")], want sha256:${published_hash%% *}"
+fi
 
 printf 'another build' >"$reg/manifests/sha-$(s12 "$r41")"
 run_step "$work/exists.sh" 0.4.1 refs/tags/v0.4.1 "$r41" SHA12="$(s12 "$r41")"
@@ -616,9 +643,17 @@ signref() { # signref VERSION MOVE_LATEST "pushed tags" "expected tags" -> rc
   expected=""
   for t in $4; do expected="$expected$image:$t"$'\n'; done
   : >"$work/gho"
-  VERSION="$1" MOVE_LATEST="$2" EXPECTED_TAGS="$expected" GITHUB_OUTPUT="$work/gho" \
-    DIGEST="sha256:$(printf '%064d' 0)" METADATA="{\"image.name\": \"$names\"}" \
-    python3 "$work/signref.py" >/dev/null 2>&1
+  # SKIP and PUBLISHED_DIGEST come from the caller's environment (the skipped
+  # push); METADATA/DIGEST are then what a skipped build step gives: nothing.
+  if [ "${SKIP:-}" = true ]; then
+    SKIP=true PUBLISHED_DIGEST="${PUBLISHED_DIGEST:-}" DIGEST="" METADATA="" \
+      IMAGE_NAME="${SIGNREF_IMAGE:-$image}" VERSION="$1" MOVE_LATEST="$2" EXPECTED_TAGS="$expected" GITHUB_OUTPUT="$work/gho" \
+      python3 "$work/signref.py" >/dev/null 2>&1
+  else
+    IMAGE_NAME="$image" VERSION="$1" MOVE_LATEST="$2" EXPECTED_TAGS="$expected" GITHUB_OUTPUT="$work/gho" \
+      DIGEST="sha256:$(printf '%064d' 0)" METADATA="{\"image.name\": \"$names\"}" \
+      python3 "$work/signref.py" >/dev/null 2>&1
+  fi
 }
 
 expect_signref() { # expect_signref NAME WANT-RC VERSION MOVE_LATEST "pushed" ["expected"]
@@ -641,6 +676,254 @@ expect_signref "older-line patch with :latest is refused" 1 0.3.2 false "0.3.2 l
 expect_signref "empty VERSION with :latest is refused" 1 "" true "0.4.1 latest sha-abc"
 expect_signref "pushed tags differing from the computed tags are refused" 1 0.4.1 true \
   "0.4.1 0.4 latest sha-abc" "0.4.1 sha-abc"
+expect_signref "no computed tags is refused" 1 0.4.1 true "" ""
+
+# The skipped push: signref signs the digest the overwrite guard found.
+published="sha256:$(printf '%064x' 7)"
+SKIP=true PUBLISHED_DIGEST="$published" \
+  expect_signref "skipped push: the published digest is signed under the computed tags" 0 0.4.1 true "0.4.1 0.4 latest sha-abc"
+if [ "$(sed -n 's/^digest=//p' "$work/gho")" = "$published" ] && [ "$(sed -n 's/^repo=//p' "$work/gho")" = "$image" ]; then
+  ok "signref: skipped push: the signed ref is the published digest of $image"
+else
+  bad "signref: skipped push: outputs: $(cat "$work/gho")"
+fi
+SKIP=true PUBLISHED_DIGEST="" \
+  expect_signref "skipped push with no published digest is refused" 1 0.4.1 true "0.4.1 0.4 latest sha-abc"
+SKIP=true PUBLISHED_DIGEST="sha256:not-a-digest" \
+  expect_signref "skipped push with a malformed published digest is refused" 1 0.4.1 true "0.4.1 0.4 latest sha-abc"
+SKIP=true PUBLISHED_DIGEST="$published" \
+  expect_signref "skipped push: :latest without MOVE_LATEST is still refused" 1 0.4.1 false "0.4.1 0.4 latest sha-abc"
+SKIP=true PUBLISHED_DIGEST="$published" \
+  expect_signref "skipped push: a beta with :latest is still refused" 1 0.5.0-beta.1 true "0.5.0-beta.1 latest sha-abc"
+SKIP=true PUBLISHED_DIGEST="$published" \
+  expect_signref "skipped push: no computed tags is refused" 1 0.4.1 true "" ""
+SKIP=true PUBLISHED_DIGEST="$published" SIGNREF_IMAGE="docker.io/somebody/else" \
+  expect_signref "skipped push: an image outside ghcr.io/hugmesh is refused" 1 0.4.1 true "0.4.1 0.4 latest sha-abc"
+SKIP=true PUBLISHED_DIGEST="$published" SIGNREF_IMAGE="ghcr.io/Hugmesh/Forum" \
+  expect_signref "skipped push: an image name with upper case is refused" 1 0.4.1 true "0.4.1 0.4 latest sha-abc"
+SKIP=false PUBLISHED_DIGEST="$published" \
+  expect_signref "a pushed build is signed under the build step's digest" 0 0.4.1 true "0.4.1 0.4 latest sha-abc"
+if [ "$(sed -n 's/^digest=//p' "$work/gho")" = "sha256:$(printf '%064d' 0)" ]; then
+  ok "signref: a pushed build ignores the guard's digest"
+else
+  bad "signref: a pushed build signed $(sed -n 's/^digest=//p' "$work/gho"), not the build step's digest"
+fi
+
+# --- the image job end to end: the normal path, a Sigstore failure, a re-run ----
+# Runs the release steps of the image job in the workflow's order and with the
+# if: conditions release.yml states (the wiring checks below pin them):
+#   exists.sh -> meta.sh -> push (a stub, skipped when exists said skip=true)
+#   -> signref.py (when the push ran or was skipped) -> the workflow's own
+#   `cosign sign` line -> digest.sh,
+# then github-release's step when, and only when, every step passed (that job
+# needs a successful image job and nothing continues on error). Sets $job to
+# the step that failed, or "ok", and gathers every call in $work/jobcalls.
+cosign_line="$(sed -n 's/^ *run: \(cosign sign .*\)$/\1/p' "$workflow")"
+if [ "$cosign_line" = 'cosign sign --yes "$REF"' ]; then
+  ok "workflow: the signing step is cosign sign --yes on the signref digest"
+else
+  bad "workflow: the signing step: [$cosign_line]"
+fi
+
+image_job() { # image_job VERSION REF SHA
+  local version ref sha sha12 skip tags move_latest digest metadata names t hash
+  version="$1"; ref="$2"; sha="$3"; sha12="$(s12 "$sha")"
+  job=ok
+  : >"$work/jobcalls"
+  : >"$work/signref.out"
+  run_step "$work/exists.sh" "$version" "$ref" "$sha" SHA12="$sha12"
+  cat "$reg/calls" >>"$work/jobcalls"
+  if [ "$step_rc" != 0 ]; then job=exists; return 0; fi
+  skip="$(sed -n 's/^skip=//p' "$work/gho")"
+  published_digest="$(sed -n 's/^digest=//p' "$work/gho")"
+  run_step "$work/meta.sh" "$version" "$ref" "$sha" SHA12="$sha12"
+  cat "$reg/calls" >>"$work/jobcalls"
+  if [ "$step_rc" != 0 ]; then job=meta; return 0; fi
+  tags="$(sed -n '/^tags<<EOF_TAGS$/,/^EOF_TAGS$/p' "$work/gho" | sed '1d;$d')"
+  move_latest="$(sed -n 's/^move_latest=//p' "$work/gho")"
+  digest=""; metadata=""
+  if [ "$skip" != true ]; then
+    # docker/build-push-action: every computed tag now points at this
+    # commit's build, and the step reports that digest and the pushed names.
+    names=""
+    while IFS= read -r t; do
+      printf '{"schemaVersion":2,"build":"%s"}' "$sha12" >"$reg/manifests/${t##*:}"
+      names="$names${names:+,}$t"
+    done <<<"$tags"
+    echo "push $names" >>"$work/jobcalls"
+    hash="$(sha256sum "$reg/manifests/sha-$sha12")"
+    digest="sha256:${hash%% *}"
+    metadata="{\"image.name\": \"$names\"}"
+  fi
+  : >"$work/gho"
+  if ! (cd "$work/clone" && env PATH="$work/bin:$PATH" IMAGE_NAME="$image" VERSION="$version" \
+      SKIP="$skip" PUBLISHED_DIGEST="$published_digest" DIGEST="$digest" METADATA="$metadata" \
+      EXPECTED_TAGS="$tags" MOVE_LATEST="$move_latest" GITHUB_OUTPUT="$work/gho" \
+      python3 "$work/signref.py" >"$work/signref.out" 2>&1); then
+    job=signref; return 0
+  fi
+  signref_digest="$(sed -n 's/^digest=//p' "$work/gho")"
+  : >"$reg/calls"
+  if ! (PATH="$work/bin:$PATH" REF="$(sed -n 's/^repo=//p' "$work/gho")@$signref_digest" \
+      bash --noprofile --norc -e -c "$cosign_line" >>"$work/signref.out" 2>&1); then
+    cat "$reg/calls" >>"$work/jobcalls"
+    job=cosign; return 0
+  fi
+  cat "$reg/calls" >>"$work/jobcalls"
+  run_step "$work/digest.sh" "$version" "$ref" "$sha" TAGS="$tags" DIGEST="$signref_digest"
+  cat "$reg/calls" >>"$work/jobcalls"
+  digest_out="$step_out"
+  if [ "$step_rc" != 0 ]; then job=digest; return 0; fi
+  run_step "$work/release.sh" "$version" "$ref" "$sha"
+  cat "$reg/calls" >>"$work/jobcalls"
+  if [ "$step_rc" != 0 ]; then job=release; return 0; fi
+}
+
+expect_job() { # expect_job NAME WANT-STEP-OR-ok
+  if [ "$job" = "$2" ]; then
+    ok "image job: $1"
+  else
+    bad "image job: $1: stopped at [$job], want [$2]: $step_out $(cat "$work/signref.out")"
+  fi
+}
+version_signed() { # version_signed VERSION: :VERSION's digest has a cosign signature
+  local h
+  h="$(sha256sum "$reg/manifests/$1")"
+  grep -Fx -e "$image@sha256:${h%% *}" "$reg/signed" >/dev/null
+}
+release_flag() { # release_flag NAME FLAG: the chain created the GitHub release with FLAG
+  local created
+  created="$(sed -n 's/^gh release create //p' "$work/jobcalls")"
+  case " $created " in
+    *" $2 "*) ok "$1" ;;
+    *) bad "$1: gh release create [$created]" ;;
+  esac
+}
+no_release() { # no_release NAME
+  if grep -q '^gh release create ' "$work/jobcalls"; then
+    bad "$1: a GitHub release was created: $(cat "$work/jobcalls")"
+  else
+    ok "$1"
+  fi
+}
+# The invariant behind every scenario: a GitHub release exists only for a
+# signed :X.Y.Z. Checked after each run of the job.
+never_unsigned_release() { # never_unsigned_release NAME VERSION
+  if grep -q '^gh release create ' "$work/jobcalls" && ! version_signed "$2"; then
+    bad "$1: a GitHub release was created over an UNSIGNED :$2"
+  else
+    ok "$1: no GitHub release without a signature on :$2"
+  fi
+}
+
+rm -f "$reg/manifests/"*
+: >"$reg/signed"
+
+# The normal path.
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "normal stable run passes every step" ok
+if grep -q "^push $image:0.4.1,$image:0.4,$image:latest,$image:sha-$(s12 "$r41")$" "$work/jobcalls"; then
+  ok "image job: normal stable run pushes :X.Y.Z, :X.Y, :latest and :sha"
+else
+  bad "image job: normal stable run pushed: $(grep '^push ' "$work/jobcalls")"
+fi
+if version_signed 0.4.1; then ok "image job: normal stable run signs the pushed digest"; else bad "image job: normal run signed [$(cat "$reg/signed")]"; fi
+release_flag "image job: normal stable run creates the GitHub release as Latest" "--latest"
+never_unsigned_release "normal stable run" 0.4.1
+
+# A Sigstore outage on the first attempt: the image is out, unsigned, and no
+# release is created.
+rm -f "$reg/manifests/"*
+: >"$reg/signed"
+touch "$reg/cosign-fail"
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "first attempt: a cosign failure fails the job" cosign
+if [ -e "$reg/manifests/0.4.1" ] && ! version_signed 0.4.1; then
+  ok "image job: first attempt: :X.Y.Z is published and unsigned"
+else
+  bad "image job: first attempt: manifests: $(ls "$reg/manifests"), signed: $(cat "$reg/signed")"
+fi
+no_release "image job: first attempt: no GitHub release over the unsigned image"
+never_unsigned_release "first attempt" 0.4.1
+
+# "Re-run failed jobs" while Sigstore is still down: still no release.
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "re-run with cosign still failing fails again" cosign
+if grep -q '^push ' "$work/jobcalls"; then bad "image job: re-run pushed again"; else ok "image job: re-run pushes nothing"; fi
+no_release "image job: re-run with cosign still failing: no GitHub release"
+never_unsigned_release "re-run, cosign still failing" 0.4.1
+
+# "Re-run failed jobs" once Sigstore is back: the published digest is signed,
+# every computed tag is checked against it, and the release is created.
+rm "$reg/cosign-fail"
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "re-run after a Sigstore failure repairs the release" ok
+if grep -q '^push ' "$work/jobcalls"; then bad "image job: repairing re-run pushed again"; else ok "image job: repairing re-run pushes nothing"; fi
+case "$(cat "$work/signref.out")" in
+  *"re-signing the published $image@sha256:"*) ok "image job: repairing re-run signs the published digest" ;;
+  *) bad "image job: repairing re-run signref: $(cat "$work/signref.out")" ;;
+esac
+if version_signed 0.4.1; then ok "image job: repairing re-run: :X.Y.Z is now signed"; else bad "image job: repairing re-run signed [$(cat "$reg/signed")]"; fi
+for t in 0.4.1 0.4 latest "sha-$(s12 "$r41")"; do
+  case "$digest_out" in
+    *"$image:$t -> sha256:"*"(signed)"*) ok "image job: repairing re-run checks :$t resolves to the signed digest" ;;
+    *) bad "image job: repairing re-run did not check :$t: $digest_out" ;;
+  esac
+done
+release_flag "image job: repairing re-run creates the GitHub release as Latest" "--latest"
+never_unsigned_release "repairing re-run" 0.4.1
+
+# The same re-run after a newer line shipped: :latest is neither demanded of
+# the old digest nor given to the release.
+g tag v0.9.0 "$r90"
+g push -q origin v0.9.0
+published 0.9.0
+printf 'the 0.9.0 build' >"$reg/manifests/latest"
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "re-run after a newer line shipped still passes" ok
+case "$digest_out" in
+  *"$image:latest"*) bad "image job: re-run after a newer line checked :latest: $digest_out" ;;
+  *) ok "image job: re-run after a newer line shipped does not demand :latest of the old digest" ;;
+esac
+release_flag "image job: re-run after a newer line shipped: the release is not Latest" "--latest=false"
+never_unsigned_release "re-run after a newer line shipped" 0.4.1
+g push -q origin :refs/tags/v0.9.0
+g tag -d v0.9.0 >/dev/null
+unpublished 0.9.0
+
+# A floating tag the first attempt never wrote cannot be repaired: fail, no release.
+rm "$reg/manifests/0.4"
+: >"$reg/signed"
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "re-run with a computed tag the registry lacks fails the digest check" digest
+no_release "image job: a missing computed tag: no GitHub release"
+never_unsigned_release "re-run with a missing tag" 0.4.1
+
+# :X.Y.Z from another build is refused before anything, as before.
+rm -f "$reg/manifests/"*
+printf 'another build' >"$reg/manifests/0.4.1"
+image_job 0.4.1 refs/tags/v0.4.1 "$r41"
+expect_job "a published :X.Y.Z from another build is refused by the guard" exists
+no_release "image job: another build: no GitHub release"
+
+# A beta: the normal path, then a re-run after :beta moved on, which is not
+# repairable (the next beta is cut instead) and creates no release.
+rm -f "$reg/manifests/"*
+: >"$reg/signed"
+image_job 0.5.0-beta.1 refs/tags/v0.5.0-beta.1 "$m6"
+expect_job "normal beta run passes every step" ok
+if version_signed 0.5.0-beta.1; then ok "image job: normal beta run signs the pushed digest"; else bad "image job: beta signed [$(cat "$reg/signed")]"; fi
+release_flag "image job: normal beta run creates a prerelease" "--prerelease"
+release_flag "image job: normal beta run: never Latest" "--latest=false"
+never_unsigned_release "normal beta run" 0.5.0-beta.1
+: >"$reg/signed"
+printf 'a newer beta' >"$reg/manifests/beta"
+image_job 0.5.0-beta.1 refs/tags/v0.5.0-beta.1 "$m6"
+expect_job "beta re-run after :beta moved on fails the digest check" digest
+no_release "image job: beta re-run after :beta moved on: no GitHub release"
+never_unsigned_release "beta re-run after :beta moved on" 0.5.0-beta.1
+rm -f "$reg/manifests/"*
+: >"$reg/signed"
 
 # --- wiring: release.yml uses the script and keeps the guards -----------------
 has() { # has NAME FIXED-STRING: the workflow contains the string
@@ -669,6 +952,19 @@ has "overwrite guard fails closed on an unknown error" 'could not tell whether $
 has "signref keeps the :latest literal" 'if "latest" in tags and ("-" in (os.environ.get("VERSION") or "-")'
 has "signref compares pushed and computed tags" 'EXPECTED_TAGS: ${{ steps.meta.outputs.tags }}'
 has "every pushed tag is checked against the signed digest" "Check every pushed tag resolves to the signed digest"
+has "the digest check covers the tags computed right before the push" '          TAGS: ${{ steps.meta.outputs.tags }}'
+has "cosign signs the signref digest, never a tag" 'REF: ${{ steps.signref.outputs.repo }}@${{ steps.signref.outputs.digest }}'
+has "signref also runs when the push was skipped" "if: steps.build.outcome == 'success' || steps.exists.outputs.skip == 'true'"
+has "signref knows when the push was skipped" 'SKIP: ${{ steps.exists.outputs.skip }}'
+has "signref takes the published digest from the overwrite guard" 'PUBLISHED_DIGEST: ${{ steps.exists.outputs.digest }}'
+has "the overwrite guard hands the published digest on" 'echo "digest=sha256:$published" >> "$GITHUB_OUTPUT"'
+code_lacks() { # code_lacks NAME FIXED-STRING: the workflow's code (full-line comments dropped) lacks the string
+  if sed '/^[[:space:]]*#/d' "$workflow" | grep -F -e "$2" >/dev/null; then bad "workflow: $1 (found: $2)"; else ok "workflow: $1"; fi
+}
+code_lacks "no step continues on error" "continue-on-error"
+code_lacks "no step or job runs after a failure (always)" "always()"
+code_lacks "no step or job runs after a failure (cancelled)" "cancelled()"
+code_lacks "no step or job runs after a failure (failure)" "failure()"
 has "beta GitHub release is a prerelease, never Latest" "*-*) args+=(--prerelease --latest=false) ;;"
 has "newest stable GitHub release is marked Latest" "args+=(--latest)"
 has "older-line stable GitHub release is not Latest" "args+=(--latest=false)"
@@ -691,8 +987,33 @@ pre = at("- name: Build the image (no push)", image)
 meta = at("- name: Compute tags and labels", image)
 push = at("- name: Build and push image", image)
 create = at("- name: Create the GitHub release", release)
+signref = at("- name: Resolve the pushed image name and digest", image)
+def step_ifs(start, end):
+    """(name, if) of every step between the lines start and end."""
+    out = []
+    name = cond = None
+    for l in lines[start:end]:
+        t = l.strip()
+        if t.startswith("- name: "):
+            if name is not None:
+                out.append((name, cond))
+            name, cond = t[len("- name: "):], None
+        elif t.startswith("if: "):
+            cond = t[len("if: "):]
+    if name is not None:
+        out.append((name, cond))
+    return out
+after_signref = step_ifs(signref, release)[1:]
+needs_line = next(l.strip() for l in lines[release:] if l.strip().startswith("needs:"))
 checks = {
     "the image is built before the tags are decided": pre < meta,
+    "the tags are computed even when the push is skipped (no if: on the meta step)":
+        not any(l.strip().startswith("if:") for l in lines[meta:push]),
+    "both build steps run only when the push is not skipped":
+        all(c == "steps.exists.outputs.skip != 'true'" for n, c in step_ifs(pre, meta) + step_ifs(push, signref)),
+    "every step after signref runs only on a successful signref (so nothing is skipped around a failed signature)":
+        len(after_signref) >= 6 and all(c == "steps.signref.outcome == 'success'" for n, c in after_signref),
+    "github-release needs a successful image job": needs_line == "needs: [version, image]",
     "the tags are decided in the step right before the push":
         meta < push and not any(l.strip().startswith("- name:") for l in lines[meta + 1:push]),
     "the first build pushes nothing": "push: false" in [l.strip() for l in lines[pre:meta]],

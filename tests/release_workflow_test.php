@@ -154,6 +154,37 @@ class release_workflow_test extends TestCase
         $this->assertStringNotContainsString('push-to-registry: false', $after);
     }
 
+    public function test_a_skipped_push_still_signs_and_an_unsigned_image_gets_no_release(): void
+    {
+        // "Re-run failed jobs" after a cosign/attest failure finds :X.Y.Z published from this
+        // commit and skips the push. signref must then still run, on the digest the overwrite
+        // guard found, so the signature, both attestations and the tag check repair the
+        // release; and github-release must only ever follow a successful image job, with
+        // nothing in between allowed to continue past a failure.
+        $code = preg_replace('/^\s*#.*$/m', '', $this->workflow());
+        $jobs = $this->jobs();
+        $image = preg_replace('/^\s*#.*$/m', '', $jobs['image'] ?? '');
+        $this->assertStringContainsString("if: steps.build.outcome == 'success' || steps.exists.outputs.skip == 'true'", $image);
+        $this->assertStringContainsString('SKIP: ${{ steps.exists.outputs.skip }}', $image);
+        $this->assertStringContainsString('PUBLISHED_DIGEST: ${{ steps.exists.outputs.digest }}', $image);
+        $this->assertStringContainsString('echo "digest=sha256:$published" >> "$GITHUB_OUTPUT"', $image);
+        $this->assertStringNotContainsString('continue-on-error', $code);
+        $this->assertStringNotContainsString('always()', $code);
+        $this->assertStringNotContainsString('cancelled()', $code);
+        $this->assertStringNotContainsString('failure()', $code);
+        $release = preg_replace('/^\s*#.*$/m', '', $jobs['github-release'] ?? '');
+        $this->assertMatchesRegularExpression('/^    needs: \[version, image\]$/m', $release);
+        // Every step after signref is gated on signref alone (the sign, the attestations,
+        // the SBOM, the tag check, the summary), so none of them is skipped around a failure.
+        $after = substr($image, (int) strpos($image, 'id: signref'));
+        $this->assertSame(
+            substr_count($after, "\n      - name: ") ,
+            substr_count($after, "if: steps.signref.outcome == 'success'"),
+            'every step after signref carries if: steps.signref.outcome == success'
+        );
+        $this->assertGreaterThanOrEqual(6, substr_count($after, "if: steps.signref.outcome == 'success'"));
+    }
+
     public function test_notify_site_has_no_permissions_and_runs_only_for_v_tags(): void
     {
         $note = preg_replace('/^\s*#.*$/m', '', $this->jobs()['notify-site'] ?? '');

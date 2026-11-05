@@ -314,6 +314,14 @@ moves `:X.Y` or `:latest` back to an older release. A patch on an older line mov
 same commit skips the push, anything else fails. The floating `:beta`, `:X.Y` and `:latest`
 move. Every pushed tag is checked to resolve to the signed, attested digest.
 
+A re-run that skips the push still signs, attests and checks the digest that is already
+published, so "Re-run failed jobs" after a Sigstore failure repairs the release instead of
+going green around it. The GitHub Release is only created by a run whose image job
+succeeded, and that job only succeeds once every tag resolves to the signed digest: an
+unsigned image never gets a GitHub Release, Latest or otherwise. A beta re-run whose
+`:beta` has moved on to a newer beta fails that check and is not repairable; cut the next
+beta instead.
+
 To cut a beta, merge the version bump on `main`, then push a signed tag on that commit:
 
 ```bash
