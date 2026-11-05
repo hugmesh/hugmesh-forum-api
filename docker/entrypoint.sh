@@ -160,6 +160,14 @@ enable_extension() {
         php bin/phpbbcli.php extension:enable "${EXT_NAME}" \
             && log "extension '${EXT_NAME}' enabled (or already enabled)" \
             || log "extension:enable returned non-zero (already enabled?) — continuing"
+        # extension:enable runs an extension's migrations only on the disabled->enabled
+        # transition, so a board that enabled an OLDER build never gets a migration added
+        # later (m2_system_pm_idempotency). db:migrate applies whatever is still pending
+        # for the enabled extensions and is a no-op when nothing is. Without the m2 table
+        # the system private-message route fails closed (500, nothing sent).
+        php bin/phpbbcli.php db:migrate \
+            && log "db:migrate complete (pending extension migrations applied, if any)" \
+            || log "db:migrate returned non-zero — the system PM route will 500 until it succeeds"
     else
         log "extension '${EXT_NAME}' not yet discoverable by phpbbcli (DB not installed yet?) — skipping this boot"
     fi

@@ -131,6 +131,24 @@ class authenticator
     }
 
     /**
+     * Require the {@code @system} machine principal (the system private-message route).
+     * Admin and superadmin are deliberately NOT accepted: the route sends as the caller,
+     * and only the neutral {@code @system} sender may do that.
+     *
+     * @param principal $p
+     * @return void
+     *
+     * @throws auth_exception 403 for any other principal.
+     */
+    public function require_system(principal $p)
+    {
+        if (!$p->is_system())
+        {
+            throw auth_exception::forbidden('System principal required.');
+        }
+    }
+
+    /**
      * Ownership check for edit/delete: the caller must own the post (its authorSubject
      * equals the caller's sub) UNLESS the caller is a moderator or admin.
      *

@@ -185,3 +185,16 @@ hugmesh_forumapi_admin_unban_user:
         _controller: hugmesh.forumapi.controller.admin:unban_user
     requirements:
         sub: '[^/]+'
+
+# ── System (the @system notification sender ONLY: ROLE_SYSTEM, not admin) ──
+# The phpBB end of admin-bff ForumSystemPmClient's contract, forwarded unchanged by
+# forum-bff POST /bff/forum/system/private-messages. Sends a phpBB private message
+# FROM the caller's own phpBB user to the user mapped from body.recipient (a Casdoor
+# subject); Idempotency-Key is required. 404 {"code":"unknown_recipient"} when the
+# subject maps to no phpBB user.
+
+hugmesh_forumapi_system_private_messages:
+    path: /api/v1/hugmesh/system/private-messages
+    methods: [POST]
+    defaults:
+        _controller: hugmesh.forumapi.controller.system:send_private_message

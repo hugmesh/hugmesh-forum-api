@@ -25,6 +25,13 @@ class principal
     public const ROLE_FORUM = 'ROLE_FORUM';
 
     /**
+     * The machine role held ONLY by the per-domain {@code @system} notification sender
+     * (Casdoor role {@code ROLE_SYSTEM}). It is the sole key to the system private-message
+     * route; no human role (user, mod, admin) implies it.
+     */
+    public const ROLE_SYSTEM = 'ROLE_SYSTEM';
+
+    /**
      * @var string The Casdoor sub claim (immutable identity).
      */
     private $subject;
@@ -137,6 +144,24 @@ class principal
     public function is_moderator()
     {
         return $this->is_admin() || $this->has_authority(self::ROLE_MOD);
+    }
+
+    /**
+     * True only for the {@code @system} sender: the token's {@code roles} claim named the
+     * Casdoor role {@code system} / {@code ROLE_SYSTEM}.
+     *
+     * Both spellings are accepted because {@see jwt_verifier::derive_authorities()}
+     * prefixes every role name with {@code ROLE_} without first stripping one, so the
+     * Casdoor seed's literal role name {@code ROLE_SYSTEM} arrives here as
+     * {@code ROLE_ROLE_SYSTEM}. Either form can only come from the {@code roles} claim:
+     * a {@code permissions} entry starting with {@code ROLE_} is dropped by the verifier,
+     * and admin ({@code isAdmin} / {@code ROLE_ADMIN}) does NOT imply it.
+     *
+     * @return bool
+     */
+    public function is_system()
+    {
+        return $this->has_authority(self::ROLE_SYSTEM) || $this->has_authority('ROLE_' . self::ROLE_SYSTEM);
     }
 
     /**
