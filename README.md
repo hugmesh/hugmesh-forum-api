@@ -59,6 +59,7 @@ match the forum-bff Jackson records exactly. Timestamps are ISO-8601 strings.
 | POST | `/admin/moderation/{id}/reject` | — | 204 | ADMIN |
 | POST | `/admin/users/{sub}/ban` | `BanRequest?` | 204 | ADMIN |
 | DELETE | `/admin/users/{sub}/ban` | — | 204 | ADMIN |
+| POST | `/system/private-messages` | `SystemPm` + `Idempotency-Key` header | `{"id":n}` (200) | SYSTEM only (not ADMIN) |
 
 ### JSON shapes
 
@@ -161,6 +162,24 @@ committed.** See `.env.example`.
   the answer is 404. A ban upserts `phpbb_banlist`, changes `user_type`, drops all groups
   except `REGISTERED`, and kills the user's sessions. An unban removes the entry,
   restores `user_type = 0`, ensures `REGISTERED`, and kills stale sessions.
+- **System private messages** (`POST /system/private-messages`): the phpBB end of
+  admin-bff's `ForumSystemPmClient` contract, reached through forum-bff
+  `POST /bff/forum/system/private-messages`. Body
+  `{"recipient":"<casdoor sub>","subject":"…","text":"…"}`; the `Idempotency-Key`
+  header is required (1-255 visible ASCII). Only a token whose `roles` name `system` /
+  `ROLE_SYSTEM` may call it; admin, superadmin, mod and `ROLE_SERVICE` get 403. No
+  account holds that role yet (admin-bff provisions `@system` with `user`, `matrix`,
+  `mastodon`), so admin-bff must grant `system` before its forum channel can deliver. The
+  message is sent with phpBB's `submit_pm('post', …)` FROM the caller's own mapped
+  phpBB user (created on first use) as plain text (no BBCode or smilies), with no
+  outbox copy. Answers: `200 {"id":<msg_id>}`; the same key and body again gives the same
+  200 plus `Idempotent-Replayed: true` and sends nothing; `404 {"code":"unknown_recipient"}`
+  when the subject maps to no phpBB user (nothing is written); `422
+  {"code":"idempotency_key_reused"}` for the same key with a different body. The key
+  ledger (`phpbb_hugmesh_system_pm_idem`, migration `m2`) is written in the same
+  transaction as the message, so a failed send leaves no row and the retry sends once.
+  The entrypoint runs `db:migrate` on every boot so a board that enabled an older build
+  gets the table; without it the route fails closed (500, nothing sent).
 - **Reads** query phpBB tables through the injected DBAL connection and map the rows to
   the DTOs. Stats are `COUNT` queries (`source = "live"`).
 - **Sticker tokens**: `:snap-sticker:<slug>:` in stored post text is rendered on the server

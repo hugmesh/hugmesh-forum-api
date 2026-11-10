@@ -66,6 +66,27 @@ services:
             - '%core.root_path%'
             - '%core.php_ext%'
 
+    # The @system private-message send: ledger (migration m2) + phpBB submit_pm wrapper.
+    hugmesh.forumapi.service.system_pm_store:
+        class: hugmesh\forumapi\service\system_pm_store
+        arguments:
+            - '@dbal.conn'
+            - '%core.table_prefix%'
+
+    hugmesh.forumapi.service.pm_sender:
+        class: hugmesh\forumapi\service\pm_sender
+        arguments:
+            - '@user'
+            - '%core.root_path%'
+            - '%core.php_ext%'
+
+    hugmesh.forumapi.service.system_pm_service:
+        class: hugmesh\forumapi\service\system_pm_service
+        arguments:
+            - '@hugmesh.forumapi.service.user_mapper'
+            - '@hugmesh.forumapi.service.system_pm_store'
+            - '@hugmesh.forumapi.service.pm_sender'
+
     # ── controllers ──────────────────────────────────────────────────
     # @symfony_request is phpBB's own Symfony Request (built from the phpBB request, which
     # retains the real GET/POST/SERVER/headers). It MUST be injected instead of calling
@@ -96,6 +117,13 @@ services:
             - '@hugmesh.forumapi.service.forum_repository'
             - '@hugmesh.forumapi.service.admin_service'
             - '@hugmesh.forumapi.service.posting_service'
+            - '@symfony_request'
+
+    hugmesh.forumapi.controller.system:
+        class: hugmesh\forumapi\controller\system_controller
+        arguments:
+            - '@hugmesh.forumapi.auth.authenticator'
+            - '@hugmesh.forumapi.service.system_pm_service'
             - '@symfony_request'
 
     # ── event listeners ─────────────────────────────────────────────
