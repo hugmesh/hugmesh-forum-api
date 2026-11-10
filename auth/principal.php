@@ -151,11 +151,16 @@ class principal
      * Casdoor role {@code system} / {@code ROLE_SYSTEM}.
      *
      * Both spellings are accepted because {@see jwt_verifier::derive_authorities()}
-     * prefixes every role name with {@code ROLE_} without first stripping one, so the
-     * Casdoor seed's literal role name {@code ROLE_SYSTEM} arrives here as
-     * {@code ROLE_ROLE_SYSTEM}. Either form can only come from the {@code roles} claim:
-     * a {@code permissions} entry starting with {@code ROLE_} is dropped by the verifier,
-     * and admin ({@code isAdmin} / {@code ROLE_ADMIN}) does NOT imply it.
+     * prefixes every role name with {@code ROLE_} without first stripping one, so a
+     * Casdoor role named {@code ROLE_SYSTEM} (the {@code ROLE_<UPPER>} spelling admin-bff
+     * gives the @system account's other roles) arrives here as {@code ROLE_ROLE_SYSTEM}.
+     * Either form can only come from the {@code roles} claim: a {@code permissions} entry
+     * starting with {@code ROLE_} is dropped by the verifier, and admin ({@code isAdmin} /
+     * {@code ROLE_ADMIN}) does NOT imply it.
+     *
+     * Nothing grants this role yet: admin-bff's SystemAccountProvisioner gives the
+     * {@code @system} account exactly {@code [user, matrix, mastodon]}, which this check
+     * refuses. Adding {@code system} there is a prerequisite of turning the forum channel on.
      *
      * @return bool
      */

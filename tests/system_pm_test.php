@@ -258,10 +258,10 @@ class system_pm_test extends TestCase
         $this->assertSame(0, $this->store->depth, 'transaction closed');
     }
 
-    public function test_the_seeded_role_spelling_ROLE_SYSTEM_is_accepted_too(): void
+    public function test_the_casdoor_role_spelling_ROLE_SYSTEM_is_accepted_too(): void
     {
-        // Casdoor's seed names roles literally (ROLE_SYSTEM); the verifier turns that into
-        // ROLE_ROLE_SYSTEM, and the role-object form must work the same.
+        // A Casdoor role named ROLE_SYSTEM (admin-bff's ROLE_<UPPER> spelling) reaches the
+        // verifier as ROLE_ROLE_SYSTEM, and the role-object form must work the same.
         foreach ([['ROLE_SYSTEM'], [['name' => 'ROLE_SYSTEM']], [['name' => 'system']]] as $i => $roles)
         {
             $r = $this->call($this->token(['roles' => $roles]), 'k-' . $i, $this->body());

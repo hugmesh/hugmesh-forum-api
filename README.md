@@ -167,7 +167,9 @@ committed.** See `.env.example`.
   `POST /bff/forum/system/private-messages`. Body
   `{"recipient":"<casdoor sub>","subject":"…","text":"…"}`; the `Idempotency-Key`
   header is required (1-255 visible ASCII). Only a token whose `roles` name `system` /
-  `ROLE_SYSTEM` may call it; admin, superadmin, mod and `ROLE_SERVICE` get 403. The
+  `ROLE_SYSTEM` may call it; admin, superadmin, mod and `ROLE_SERVICE` get 403. No
+  account holds that role yet (admin-bff provisions `@system` with `user`, `matrix`,
+  `mastodon`), so admin-bff must grant `system` before its forum channel can deliver. The
   message is sent with phpBB's `submit_pm('post', …)` FROM the caller's own mapped
   phpBB user (created on first use) as plain text (no BBCode or smilies), with no
   outbox copy. Answers: `200 {"id":<msg_id>}`; the same key and body again gives the same
