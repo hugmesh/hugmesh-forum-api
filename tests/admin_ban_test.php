@@ -201,7 +201,7 @@ namespace hugmesh\forumapi\tests
          * Fresh ban (no existing banlist entry):
          * Q0: SELECT ban_id (returns false — no existing ban)
          * Q1: INSERT INTO phpbb_banlist
-         * Q2: UPDATE phpbb_users SET user_type=3  (USER_IGNORE)
+         * Q2: UPDATE phpbb_users SET user_type=2  (USER_IGNORE; 3 would be USER_FOUNDER)
          * Q3: DELETE FROM phpbb_user_group  (non-REGISTERED groups)
          * Q4: DELETE FROM phpbb_sessions
          */
@@ -224,10 +224,14 @@ namespace hugmesh\forumapi\tests
             $this->assertStringContainsString('ban_userid', $db->queries[1]);
             $this->assertStringContainsString('ban_start', $db->queries[1]);
             $this->assertStringContainsString('ban_reason', $db->queries[1]);
+            // phpBB 3.3's phpbb_banlist has no ban_check_pm column (it arrives in 4.0); naming it
+            // made the INSERT fail on a real 3.3.11 board (hugmesh-forum-api#12).
+            $this->assertStringNotContainsString('ban_check_pm', $db->queries[1]);
 
-            // Q2: set user_type = 3 (USER_IGNORE).
+            // Q2: set user_type = 2 (USER_IGNORE), never 3 (USER_FOUNDER).
             $this->assertStringContainsString('UPDATE phpbb_users', $db->queries[2]);
-            $this->assertStringContainsString('user_type = 3', $db->queries[2]);
+            $this->assertStringContainsString('user_type = 2', $db->queries[2]);
+            $this->assertStringNotContainsString('user_type = 3', $db->queries[2], 'a ban must never make the user a founder');
             $this->assertStringContainsString('user_id = ' . self::PHPBB_ID, $db->queries[2]);
 
             // Q3: remove non-REGISTERED group memberships.
@@ -267,7 +271,8 @@ namespace hugmesh\forumapi\tests
 
             // Q2–Q4 are identical to the fresh-ban path.
             $this->assertStringContainsString('UPDATE phpbb_users', $db->queries[2]);
-            $this->assertStringContainsString('user_type = 3', $db->queries[2]);
+            $this->assertStringContainsString('user_type = 2', $db->queries[2]);
+            $this->assertStringNotContainsString('user_type = 3', $db->queries[2], 'a ban must never make the user a founder');
             $this->assertStringContainsString('DELETE FROM phpbb_user_group', $db->queries[3]);
             $this->assertStringContainsString('DELETE FROM phpbb_sessions', $db->queries[4]);
         }

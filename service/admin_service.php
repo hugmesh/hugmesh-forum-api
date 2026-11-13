@@ -225,7 +225,7 @@ class admin_service
      * (reason refreshed, ban_start reset). Steps:
      *  1. Resolve phpBB user_id from casdoor_map (404 if unmapped).
      *  2. Upsert phpbb_banlist: INSERT if no entry exists, UPDATE reason+start otherwise.
-     *  3. Set user_type = 3 (USER_IGNORE) on phpbb_users.
+     *  3. Set user_type = USER_IGNORE (2) on phpbb_users (never 3, which is USER_FOUNDER).
      *  4. Remove non-REGISTERED group memberships from phpbb_user_group.
      *  5. Kill active sessions from phpbb_sessions.
      *
@@ -277,7 +277,6 @@ class admin_service
                 'ban_ip'          => '',
                 'ban_email'       => '',
                 'ban_exclude'     => 0,
-                'ban_check_pm'    => 0,
                 'ban_start'       => (int) $now,
                 'ban_end'         => 0,
                 'ban_reason'      => (string) $reason,
@@ -287,9 +286,13 @@ class admin_service
             $this->db->sql_query($sql);
         }
 
-        // Step 3: set user_type = 3 (USER_IGNORE) so phpBB treats this user as banned.
+        // Step 3: set user_type = USER_IGNORE (2) so phpBB treats this user like a bot
+        // account that cannot sign in. NEVER 3: that is USER_FOUNDER, the board's
+        // super-administrator (phpBB includes/constants.php: NORMAL 0, INACTIVE 1,
+        // IGNORE 2, FOUNDER 3).
+        $user_ignore = defined('USER_IGNORE') ? (int) USER_IGNORE : 2;
         $sql = 'UPDATE ' . $users_table . '
-            SET user_type = 3
+            SET user_type = ' . $user_ignore . '
             WHERE user_id = ' . (int) $phpbb_id;
         $this->db->sql_query($sql);
 
