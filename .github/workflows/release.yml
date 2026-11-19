@@ -124,20 +124,20 @@ jobs:
 
   lint-and-test:
     # The same gate as .gitlab-ci.yml (php -l -> composer validate -> phpunit), run in the
-    # same php:8.3-cli image so it behaves the same on hosted and self-hosted runners
+    # same php:8.1-cli image so it behaves the same on hosted and self-hosted runners
     # (the self-hosted host has no PHP, and setup-php does not support it).
     runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: php -l, composer validate, composer install, phpunit (php:8.3-cli)
+      - name: php -l, composer validate, composer install, phpunit (php:8.1-cli)
         run: |
           # The container runs as root; the EXIT trap hands every file it wrote back to the
           # runner's user so a self-hosted runner can clean its workspace next time.
           docker run --rm -i --network host \
             -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e COMPOSER_ALLOW_SUPERUSER=1 \
             -v "$GITHUB_WORKSPACE:/app" -w /app \
-            php:8.3-cli bash -euo pipefail -s <<'GATE'
+            php:8.1-cli bash -euo pipefail -s <<'GATE'
           trap 'chown -R "$HOST_UID:$HOST_GID" /app' EXIT
           apt-get update -qq
           apt-get install -y -qq git unzip libzip-dev > /dev/null
