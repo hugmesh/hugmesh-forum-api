@@ -1,0 +1,64 @@
+# Pull-request CI: php -l on every file, composer validate, composer install, phpunit.
+# Added by hugmesh-generator#954: this repo's only workflow was release.yml, so a pull request ran no
+# build or test. This is the same gate as release.yml's `lint-and-test` job and .gitlab-ci.yml, run in the
+# same php:8.1-cli image.
+#
+# Advisory today: required status checks cannot be set on this plan (branch protection answers 403 until
+# the plan changes), so a red check does not block a merge by itself. Read it before merging.
+#
+# GitHub-hosted `ubuntu-latest`, written literally: this runs on pull_request and the repository is public,
+# so it must never name a self-hosted runner (a fork's PR runs the fork's copy of this file).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A superseded run is cancelled, so the check always reflects the latest commit.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: php -l, composer validate, phpunit (php:8.1-cli)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: php -l, composer validate, composer install, phpunit (php:8.1-cli)
+        run: |
+          # The container runs as root; the EXIT trap hands every file it wrote back to the
+          # runner's user so the workspace can be cleaned afterwards.
+          docker run --rm -i --network host \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e COMPOSER_ALLOW_SUPERUSER=1 \
+            -v "$GITHUB_WORKSPACE:/app" -w /app \
+            php:8.1-cli bash -euo pipefail -s <<'GATE'
+          trap 'chown -R "$HOST_UID:$HOST_GID" /app' EXIT
+          apt-get update -qq
+          apt-get install -y -qq git unzip libzip-dev > /dev/null
+          docker-php-ext-install zip > /dev/null 2>&1 || true
+          curl -sS https://getcomposer.org/installer | php -- --2 --install-dir=/usr/local/bin --filename=composer
+          git config --global --add safe.directory /app
+
+          echo "php -l on every .php file"
+          fail=0
+          while IFS= read -r f; do
+            if ! php -l "$f" > /dev/null; then
+              echo "SYNTAX ERROR: $f"
+              php -l "$f" || true
+              fail=1
+            fi
+          done < <(find . -path ./vendor -prune -o -name '*.php' -print)
+          [ "$fail" -eq 0 ]
+
+          composer validate --no-check-publish
+          composer install --no-interaction --prefer-dist
+          vendor/bin/phpunit --colors=never
+          GATE
