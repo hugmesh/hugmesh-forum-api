@@ -13,7 +13,7 @@ stages:
     - build
 
 default:
-    image: php:8.3-cli
+    image: php:8.1-cli
 
 variables:
     COMPOSER_ALLOW_SUPERUSER: "1"
@@ -53,7 +53,7 @@ phpunit:
         - vendor/bin/phpunit --colors=never
 
 # -----------------------------------------------------------------------------
-# build:image — bake the custom phpBB image (official phpBB 3.3.19 + THIS
+# build:image — bake the custom phpBB image (official phpBB 3.3.11 + THIS
 # extension at ext/hugmesh/forumapi, baked by the Dockerfile) and push it to
 # the in-cluster GitLab container registry. The forum deployment
 # (hugmesh-generator specs/cluster/manifests/forum/phpbb.yaml) runs this image:
