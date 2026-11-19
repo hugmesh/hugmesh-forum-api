@@ -196,7 +196,7 @@ committed.** See `.env.example`.
 ### Baked image (deployment)
 
 The `Dockerfile` builds the phpBB image: official phpBB 3.3 (`PHPBB_VERSION`, default
-3.3.11) on `php:8.1-apache`, this extension at `ext/hugmesh/forumapi/`, and
+3.3.19) on `php:8.3-apache`, this extension at `ext/hugmesh/forumapi/`, and
 `composer install` for `firebase/php-jwt`. Its entrypoint regenerates `config.php` from
 env on every boot and enables the extension via `phpbbcli` (idempotent).
 `docker-compose.yml` tags the image `hugmesh-systems/phpbb:dev`.
@@ -301,7 +301,7 @@ CI is GitLab (`.gitlab-ci.yml`): `php -l` → `composer validate` → `phpunit` 
 **`build:image`**. `build:image` bakes and pushes the custom phpBB image, on the default
 branch and tags only, from the runner tagged `hugmesh-x86, privileged`. The only GitHub
 workflow is `.github/workflows/release.yml`. It runs the same three checks in the same
-`php:8.1-cli` image, then pushes the image to GHCR.
+`php:8.3-cli` image, then pushes the image to GHCR.
 
 ### Versions and releases
 
