@@ -24,7 +24,7 @@
 #   3. enable the hugmesh/forumapi extension (idempotent), so /api/v1/hugmesh/**
 #      answers; then exec the CMD (apache2-foreground).
 #
-# EMPTY-CONFIG TRAP: phpBB 3.3.11 ships a 0-byte config.php baked into the release zip
+# EMPTY-CONFIG TRAP: phpBB 3.3.x (checked on 3.3.11 and 3.3.19) ships a 0-byte config.php baked into the release zip
 #   (and thus into this image). A bare `[ -f config.php ]` check FALSELY concludes
 #   "installed" and skips work. We detect a REAL config by NON-EMPTY (`-s`), and a real
 #   install by probing the DB for phpBB's tables — never bare `-f`.

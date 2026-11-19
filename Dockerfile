@@ -1,7 +1,7 @@
 # HugMesh phpBB image with the hugmesh/forum-api headless extension baked in.
 #
 # Produces the image the deployment references as `hugmesh-systems/phpbb:dev`:
-#   - official phpBB 3.3 on php:8.1-apache
+#   - official phpBB 3.3 on php:8.3-apache (>= 8.3.36: PHP2Shell, CVE-2026-109618/109619)
 #   - this extension copied to ext/hugmesh/forumapi/
 #   - composer install for the extension's runtime dep (firebase/php-jwt)
 #   - the extension enabled (offline, via phpbbcli) at build time when a DB is present,
@@ -13,9 +13,12 @@
 # and locks down native login/ACP. Routes are served under app.php/api/v1/hugmesh/**.
 
 # ---- stage 1: fetch phpBB + composer deps ---------------------------------
-FROM php:8.1-cli AS build
+FROM php:8.3-cli AS build
 
-ARG PHPBB_VERSION=3.3.11
+# phpBB 3.3.19 supports PHP up to 8.3 (its docs/INSTALL.html); 3.3.11 supported PHP only up to 8.1.
+# PHPBB_SHA256 is the value phpBB publishes next to the zip (phpBB-<version>.zip.sha256).
+ARG PHPBB_VERSION=3.3.19
+ARG PHPBB_SHA256=1530e5cabf7ecc9ecfaed3fa13da79f9e8a514623beafababc8800b5ce966de9
 ENV PHPBB_VERSION=${PHPBB_VERSION}
 
 RUN apt-get update \
@@ -30,6 +33,9 @@ RUN curl -sS https://getcomposer.org/installer | php -- --2 --install-dir=/usr/l
 # Fetch the official phpBB release.
 WORKDIR /opt
 RUN curl -fsSL -o phpbb.zip "https://download.phpbb.com/pub/release/3.3/${PHPBB_VERSION}/phpBB-${PHPBB_VERSION}.zip" \
+    && printf '%s  phpbb.zip\n' "${PHPBB_SHA256}" > phpbb.zip.sha256 \
+    && sha256sum -c phpbb.zip.sha256 \
+    && rm phpbb.zip.sha256 \
     && unzip -q phpbb.zip \
     && mv phpBB3 phpbb \
     && rm phpbb.zip
@@ -46,7 +52,12 @@ RUN composer config --no-plugins allow-plugins.composer/installers true \
     && rm -rf /opt/phpbb/ext/hugmesh/forumapi/.git
 
 # ---- stage 2: runtime ------------------------------------------------------
-FROM php:8.1-apache AS runtime
+FROM php:8.3-apache AS runtime
+
+# PHP2Shell (CVE-2026-109618/109619, exploited in the wild) is fixed in PHP 8.3.36. Refuse to build
+# on an older base image, for example a stale local cache of php:8.3-apache.
+RUN php -r 'exit(version_compare(PHP_VERSION, "8.3.36", ">=") ? 0 : 1);' \
+    || { echo "PHP $(php -r 'echo PHP_VERSION;') is older than 8.3.36 (PHP2Shell)" >&2; exit 1; }
 
 LABEL org.opencontainers.image.title="hugmesh-systems/phpbb" \
       org.opencontainers.image.description="phpBB 3.3 with the hugmesh/forum-api headless extension" \
